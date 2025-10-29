@@ -1,150 +1,89 @@
 ### API Reference
 
-The table below includes the information about all SQL functions exposed by Infera.
+The table below includes the information about all SQL functions exposed by Gaggle.
 
 | #  | Function                                                     | Return Type      | Description                                                                                                                                               |
 |----|:-------------------------------------------------------------|:-----------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | `infera_load_model(name VARCHAR, path_or_url VARCHAR)`       | `BOOLEAN`        | Loads an ONNX model from a local file path or a remote URL and assigns it a unique name. Returns `true` on success.                                       |
-| 2  | `infera_unload_model(name VARCHAR)`                          | `BOOLEAN`        | Unloads a model, freeing its associated resources. Returns `true` on success.                                                                             |
-| 3  | `infera_set_autoload_dir(path VARCHAR)`                      | `VARCHAR (JSON)` | Scans a directory for `.onnx` files, loads them automatically, and returns a JSON report of loaded models and any errors.                                 |
-| 4  | `infera_get_loaded_models()`                                 | `VARCHAR (JSON)` | Returns a JSON array containing the names of all currently loaded models.                                                                                 |
-| 5  | `infera_get_model_info(name VARCHAR)`                        | `VARCHAR (JSON)` | Returns a JSON object with metadata about a specific loaded model (name, input/output shapes). If the model is not loaded, this function raises an error. |
-| 6  | `infera_predict(name VARCHAR, features... FLOAT)`            | `FLOAT`          | Performs inference on a batch of data, returning a single float value for each input row.                                                                 |
-| 7  | `infera_predict_multi(name VARCHAR, features... FLOAT)`      | `VARCHAR (JSON)` | Performs inference and returns all outputs as a JSON-encoded array. This is useful for models that produce multiple predictions per sample.               |
-| 8  | `infera_predict_multi_list(name VARCHAR, features... FLOAT)` | `LIST[FLOAT]`    | Performs inference and returns all outputs as a typed list of floats. Useful for multi-output models without JSON parsing.                                |
-| 9  | `infera_predict_from_blob(name VARCHAR, data BLOB)`          | `LIST[FLOAT]`    | Performs inference on raw `BLOB` data (for example, used for an image tensor), returning the result as a list of floats.                                  |
-| 10 | `infera_is_model_loaded(name VARCHAR)`                       | `BOOLEAN`        | Returns `true` if the given model is currently loaded, otherwise `false`.                                                                                 |
-| 11 | `infera_get_version()`                                       | `VARCHAR (JSON)` | Returns a JSON object with version and build information for the Infera extension.                                                                        |
-| 12 | `infera_clear_cache()`                                       | `BOOLEAN`        | Clears the entire model cache directory, freeing up disk space. Returns `true` on success.                                                                |
-| 13 | `infera_get_cache_info()`                                    | `VARCHAR (JSON)` | Returns cache statistics including directory path, total size in bytes, file count, and configured size limit.                                            |
+| 1  | `gaggle_set_credentials(username VARCHAR, key VARCHAR)`      | `BOOLEAN`        | Sets Kaggle API credentials for the session. Returns `true` on success.                                                                                   |
+| 2  | `gaggle_search_datasets(query VARCHAR)`                      | `VARCHAR (JSON)` | Searches Kaggle for datasets matching the query and returns results as JSON.                                                                              |
+| 3  | `gaggle_get_dataset_files(dataset_path VARCHAR)`             | `VARCHAR (JSON)` | Lists all files in a Kaggle dataset (format: 'owner/dataset-name').                                                                                      |
+| 4  | `gaggle_download_dataset(dataset_path VARCHAR)`              | `VARCHAR`        | Downloads a Kaggle dataset and returns the local cache directory path.                                                                                    |
+| 5  | `gaggle_get_dataset_metadata(dataset_path VARCHAR)`          | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info.                                                                       |
 
 > [!NOTE]
-> The `features...` arguments accept `FLOAT` as well as values from `DOUBLE`, `INTEGER`, `BIGINT`, and `DECIMAL`
-> columns (all casted to floats under the hood).
+> Kaggle credentials can be provided via environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`), 
+> a `~/.kaggle/kaggle.json` file, or using the `gaggle_set_credentials()` function.
 
 ---
 
 ### Usage Examples
 
-This section includes some examples of how to use the Infera functions.
+This section includes some examples of how to use the Gaggle functions.
 
-#### Model Management
+#### Credential Management
 
 ```sql
--- Load a model from a local file
-select infera_load_model('local_model', '/path/to/model.onnx');
+-- Set credentials programmatically
+select gaggle_set_credentials('your-username', 'your-api-key');
 
--- Load a model from a remote URL
-select infera_load_model('remote_model', 'https://.../model.onnx');
-
--- Check if a model is loaded
-select infera_is_model_loaded('local_model');
--- Output: true or false
-
--- List all loaded models
-select infera_get_loaded_models();
--- Output: ["local_model", "remote_model"]
-
--- Get information about a specific model (throws an error if the model is not loaded)
-select infera_get_model_info('local_model');
--- Output: {"name":"local_model","input_shape":[-1,3],"output_shape":[-1,1],"loaded":true}
-
--- Unload a loaded model
-select infera_unload_model('remote_model');
+-- Or use environment variables: KAGGLE_USERNAME and KAGGLE_KEY
+-- Or create ~/.kaggle/kaggle.json with credentials
 ```
 
-#### Inference
+#### Dataset Discovery
 
 ```sql
--- Predict using literal feature values
-select infera_predict('my_model', 1.0, 2.5, 3.0) as prediction;
+-- Search for datasets matching a query
+select gaggle_search_datasets('housing');
+-- Returns JSON with matching datasets
 
--- Predict using DECIMAL feature values (cast automatically)
-select infera_predict('my_model', DECIMAL '1.0', DECIMAL '2.0', DECIMAL '3.0') as prediction;
-
--- Predict using columns from a table
-select id,
-       infera_predict('my_model', feature1, feature2, feature3) as prediction
-from features_table;
-
--- Get multiple outputs as a JSON array.
--- This is useful for models that return multiple outputs per prediction.
-select infera_predict_multi('multi_output_model', 1.0, 2.0);
--- Output: [0.85, 0.12, 0.03]
-
--- Get multiple outputs as a typed list of floats (no JSON parsing)
-select infera_predict_multi_list('multi_output_model', 1.0, 2.0);
--- Output: [0.85, 0.12, 0.03]
-
--- Predict using raw BLOB data (like tensor data)
-select infera_predict_from_blob('my_model', my_blob_column)
-from my_table;
--- Expected output: [0.1, 0.2, 0.3, ...] (as a LIST<FLOAT>)
+-- Get metadata about a specific dataset
+select gaggle_get_dataset_metadata('username/dataset-name');
+-- Returns JSON with size, description, update date, etc.
 ```
 
-> [!IMPORTANT]
-> When you use a model, in essence, it will be executed on your machine.
-> So make sure you download and use models from trusted sources only.
-
-#### Utility Functions
+#### Dataset Access
 
 ```sql
--- Get a JSON list of all loaded models
-select infera_get_loaded_models();
--- Output: ["linear_model", "squeezenet"]
+-- List files in a dataset
+select gaggle_get_dataset_files('username/dataset-name');
+-- Returns JSON array of files in the dataset
 
--- Check if a model is loaded
-select infera_is_model_loaded('squeezenet');
--- Output: true or false
+-- Download a dataset (cached locally)
+select gaggle_download_dataset('username/dataset-name');
+-- Returns local directory path
 
--- Get detailed metadata for a specific model (errors if the model is not loaded)
-select infera_get_model_info('squeezenet');
-/* Output:
-{
-  "name": "squeezenet",
-  "input_shape": [1, 3, 224, 224],
-  "output_shape": [1, 1000],
-  "loaded": true
-}
-*/
+-- Read a CSV file from a Kaggle dataset
+select * from read_csv('~/.gaggle_cache/datasets/username/dataset-name/file.csv');
+```
 
--- Load all models from the 'models/' directory
-select infera_set_autoload_dir('path/to/your/models');
-/* Output:
-{
-  "loaded": ["model1", "model2"],
-  "errors": []
-}
-*/
+#### Integration with DuckDB
 
--- Clear the entire model cache
-select infera_clear_cache();
--- Output: true
+```sql
+-- Load the extension
+LOAD 'build/release/extension/gaggle/gaggle.duckdb_extension';
 
--- Get cache statistics (field names as returned by the function)
-select infera_get_cache_info();
-/* Output:
-{
-  "cache_dir": "/path/to/cache",
-  "total_size_bytes": 204800,
-  "file_count": 10,
-  "size_limit_bytes": 10485760
-}
-*/
+-- Search for a dataset
+select gaggle_search_datasets('iris');
+
+-- Download and read the dataset
+select * from read_csv((
+  select gaggle_download_dataset('uciml/iris') || '/iris.csv'
+));
 ```
 
 ---
 
-### Building Infera from Source
+### Building Gaggle from Source
 
-To build Infera from source, you need to have GNU Make, CMake, and a C++ compiler (like GCC or Clang) installed.
+To build Gaggle from source, you need to have GNU Make, CMake, and a C++ compiler (like GCC or Clang) installed.
 You also need to have Rust (nightly version) and Cargo installed.
 
 1. **Clone the repository:**
 
    ```bash
-   git clone --recursive https://github.com/CogitatorTech/infera.git
-   cd infera
+   git clone --recursive https://github.com/CogitatorTech/gaggle.git
+   cd gaggle
    ```
 
 > [!NOTE]
@@ -162,7 +101,7 @@ You also need to have Rust (nightly version) and Cargo installed.
 
 3. **Build the extension:**
 
-   Run the following command to build the DuckDB shell with the Infera extension included:
+   Run the following command to build the DuckDB shell with the Gaggle extension included:
    ```bash
    make release
    ```
@@ -174,35 +113,36 @@ You also need to have Rust (nightly version) and Cargo installed.
    ```bash
    ./build/release/duckdb
    ```
-   The Infera extension will be automatically available, and you can start using the `infera_*` functions right away
+   The Gaggle extension will be automatically available, and you can start using the `gaggle_*` functions right away
    without needing to run the `load` command.
 
 > [!NOTE]
 > After a successful build, you will find the following files in the `build/release/` directory:
-> - `./build/release/duckdb`: this is a DuckDB binary with the Infera extension already statically linked to it.
+> - `./build/release/duckdb`: this is a DuckDB binary with the Gaggle extension already statically linked to it.
 > - `./build/release/test/unittest`: this is the test runner for running the SQL tests in the `test/sql/` directory.
-> - `./build/release/extension/infera/infera.duckdb_extension`: this is the loadable extension file for Infera.
+> - `./build/release/extension/gaggle/gaggle.duckdb_extension`: this is the loadable extension file for Gaggle.
 
 ---
 
 ### Configuration
 
-See [CONFIGURATION.md](CONFIGURATION.md) for more information about how to configure various settings for Infera.
+See [GAGGLE_GUIDE.md](GAGGLE_GUIDE.md) for more information about how to configure various settings for Gaggle.
 
 ### Architecture
 
-Infera is made up of two main components:
+Gaggle is made up of two main components:
 
-1. **Rust Core (`infera/src/`)**: The core logic is implemented in Rust. This component is responsible for:
-    * Loading ONNX models from local files or remote URLs.
-    * Caching remote models for efficient reuse.
-    * Managing the lifecycle of loaded models.
-    * Performing the actual model inference using the [Tract](https://github.com/sonos/tract) engine.
+1. **Rust Core (`gaggle/src/`)**: The core logic is implemented in Rust. This component is responsible for:
+    * Authenticating with Kaggle API using credentials.
+    * Searching for and discovering datasets on Kaggle.
+    * Downloading datasets and managing local cache.
+    * Listing files in datasets.
+    * Retrieving dataset metadata.
     * Exposing a C-compatible Foreign Function Interface (FFI) so that it can be called from other languages.
 
-2. **C++ DuckDB Bindings (`infera/bindings/`)**: A C++ layer that connects the Rust core and DuckDB. Its
+2. **C++ DuckDB Bindings (`gaggle/bindings/`)**: A C++ layer that connects the Rust core and DuckDB. Its
    responsibilities include:
-    * Defining the custom SQL functions (like `infera_load_model` and `infera_predict`).
+    * Defining the custom SQL functions (like `gaggle_set_credentials` and `gaggle_search_datasets`).
     * Translating data from DuckDB's internal vector-based format into the raw data pointers expected by the Rust FFI.
     * Calling the Rust functions and handling the returned results and errors.
     * Integrating with DuckDB's extension loading mechanism.

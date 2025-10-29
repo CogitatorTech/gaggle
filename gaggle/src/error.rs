@@ -1,69 +1,67 @@
-// Contains the InferaError enum and thread-local error handling logic.
+// Contains the GaggleError enum and thread-local error handling logic.
 
 use std::cell::RefCell;
 use std::ffi::{c_char, CString};
 use std::str::Utf8Error as StdUtf8Error;
 use thiserror::Error;
 
-/// Represents all possible errors that can occur within the Infera library.
+/// Represents all possible errors that can occur within the Gaggle library.
 #[derive(Error, Debug)]
 #[allow(dead_code)]
-pub enum InferaError {
-    /// Error indicating that a requested model could not be found.
-    #[error("Model not found: {0}")]
-    ModelNotFound(String),
-    /// Error for when the provided input tensor shape does not match the model's expected shape.
-    #[error("Invalid input shape: expected {expected}, got {actual}")]
-    InvalidInputShape {
-        /// The expected shape.
-        expected: String,
-        /// The actual shape provided.
-        actual: String,
-    },
-    /// An error originating from the underlying ONNX inference engine (e.g., Tract).
-    #[error("ONNX error: {0}")]
-    OnnxError(String),
-    /// Error indicating a failure in memory allocation.
-    #[error("Memory allocation error")]
-    MemoryError,
+pub enum GaggleError {
+    /// Error indicating that a requested dataset could not be found.
+    #[error("Dataset not found: {0}")]
+    DatasetNotFound(String),
     /// Error for when a C string from the FFI boundary is not valid UTF-8.
     #[error("Invalid UTF-8 string")]
     Utf8Error,
     /// Error for when a null pointer is passed as an argument to an FFI function.
     #[error("Null pointer passed")]
     NullPointer,
-    /// An I/O error that occurred while reading a file or making a network request.
+    /// An I/O error that occurred while reading/writing files.
     #[error("IO error: {0}")]
     IoError(String),
     /// An error during the serialization or deserialization of JSON data.
     #[error("JSON serialization error: {0}")]
     JsonError(String),
-    /// Error for when a feature is required but not enabled at compile time (e.g., "tract").
-    #[error("Feature not enabled: {0}")]
-    FeatureNotEnabled(String),
-    /// An error that occurred during an HTTP request to fetch a remote model.
+    /// An error that occurred during an HTTP request to Kaggle API.
     #[error("HTTP request failed: {0}")]
     HttpRequestError(String),
-    /// Error for when the model cache directory cannot be created.
-    #[error("Failed to create cache directory: {0}")]
-    CacheDirError(String),
-    /// Error for when `infera_predict_from_blob` receives a blob whose size is not a multiple of 4.
-    #[error("Invalid BLOB size: length must be a multiple of 4")]
-    InvalidBlobSize,
-    /// Error indicating a mismatch between the number of elements in a blob and the model's expected input tensor size.
-    #[error("BLOB data does not match model's expected input shape. Expected {expected} elements, but BLOB contained {actual}."
-    )]
-    BlobShapeMismatch {
-        /// The number of elements the model expected.
-        expected: usize,
-        /// The actual number of elements found in the blob.
-        actual: usize,
-    },
+    /// Error for invalid Kaggle API credentials.
+    #[error("Invalid Kaggle credentials: {0}")]
+    CredentialsError(String),
+    /// Error for invalid dataset path format.
+    #[error("Invalid dataset path: {0}")]
+    InvalidDatasetPath(String),
+    /// Error during ZIP extraction.
+    #[error("ZIP extraction failed: {0}")]
+    ZipError(String),
+    /// Error during CSV parsing.
+    #[error("CSV parsing error: {0}")]
+    CsvError(String),
 }
 
-impl From<StdUtf8Error> for InferaError {
+impl From<StdUtf8Error> for GaggleError {
     fn from(_: StdUtf8Error) -> Self {
-        InferaError::Utf8Error
+        GaggleError::Utf8Error
+    }
+}
+
+impl From<std::io::Error> for GaggleError {
+    fn from(err: std::io::Error) -> Self {
+        GaggleError::IoError(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for GaggleError {
+    fn from(err: serde_json::Error) -> Self {
+        GaggleError::JsonError(err.to_string())
+    }
+}
+
+impl From<reqwest::Error> for GaggleError {
+    fn from(err: reqwest::Error) -> Self {
+        GaggleError::HttpRequestError(err.to_string())
     }
 }
 
@@ -74,8 +72,8 @@ thread_local! {
 /// Sets the last error for the current thread.
 ///
 /// This stores the given error in a thread-local variable so it can be retrieved
-/// later by FFI clients using `infera_last_error`.
-pub(crate) fn set_last_error(err: &InferaError) {
+/// later by FFI clients using `gaggle_last_error`.
+pub(crate) fn set_last_error(err: &GaggleError) {
     if let Ok(c_string) = CString::new(err.to_string()) {
         LAST_ERROR.with(|cell| {
             *cell.borrow_mut() = Some(c_string);
@@ -94,9 +92,10 @@ pub(crate) fn set_last_error(err: &InferaError) {
 /// Returns a null pointer if no error has occurred since the last call.
 /// The caller **must not** free this pointer, as it is managed by a thread-local static variable.
 #[no_mangle]
-pub extern "C" fn infera_last_error() -> *const c_char {
+pub extern "C" fn gaggle_last_error() -> *const c_char {
     LAST_ERROR.with(|cell| match *cell.borrow() {
         Some(ref c_string) => c_string.as_ptr(),
         None => std::ptr::null(),
     })
 }
+

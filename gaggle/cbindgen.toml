@@ -1,16 +1,16 @@
-# `cbindgen` configuration for infera crate
+# `cbindgen` configuration for gaggle crate
 language = "C"
 header = "/* Generated with cbindgen */\n/* DO NOT EDIT */\n"
 trailer = "/* End of generated bindings */"
 include_version = true
-namespace = "infera"
+namespace = "gaggle"
 cpp_compat = true
 
 # Output settings
 tab_width = 2
 line_length = 100
 braces = "SameLine"
-include_guard = "INFERA_H"
+include_guard = "GAGGLE_H"
 pragma_once = true
 
 # Documentation settings
@@ -33,20 +33,20 @@ prefix = ""
 # Export settings
 [export]
 include = [
-    "infera_set_autoload_dir",
-    "infera_get_version",
-    "infera_load_model",
-    "infera_unload_model",
-    "infera_predict",
-    "infera_predict_from_blob",
-    "infera_get_model_info",
-    "infera_get_loaded_models",
-    "infera_clear_cache",
-    "infera_get_cache_info",
-    "infera_last_error",
-    "infera_free",
-    "infera_free_result",
-    "InferaInferenceResult"
+    "gaggle_set_autoload_dir",
+    "gaggle_get_version",
+    "gaggle_load_model",
+    "gaggle_unload_model",
+    "gaggle_predict",
+    "gaggle_predict_from_blob",
+    "gaggle_get_model_info",
+    "gaggle_get_loaded_models",
+    "gaggle_clear_cache",
+    "gaggle_get_cache_info",
+    "gaggle_last_error",
+    "gaggle_free",
+    "gaggle_free_result",
+    "GaggleInferenceResult"
 ]
 
 # Type mappings
@@ -60,7 +60,7 @@ bitflags = true
 
 # Define settings
 [defines]
-"target_os = linux" = "INFERA_LINUX"
-"target_os = windows" = "INFERA_WINDOWS"
-"target_os = macos" = "INFERA_MACOS"
-"feature = tract" = "INFERA_TRACT_ENABLED"
+"target_os = linux" = "GAGGLE_LINUX"
+"target_os = windows" = "GAGGLE_WINDOWS"
+"target_os = macos" = "GAGGLE_MACOS"
+"feature = tract" = "GAGGLE_TRACT_ENABLED"

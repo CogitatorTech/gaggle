@@ -1,6 +1,6 @@
 #define DUCKDB_EXTENSION_MAIN
 
-#include "include/infera_extension.hpp"
+#include "include/gaggle_extension.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
@@ -24,11 +24,11 @@
 namespace duckdb {
 
 /**
- * @brief Retrieves the last error message from the Infera Rust core.
+ * @brief Retrieves the last error message from the Gaggle Rust core.
  * @return A string containing the error message, or "unknown error" if not set.
  */
-static std::string GetInferaError() {
-  const char *err = infera::infera_last_error();
+static std::string GetGaggleError() {
+  const char *err = gaggle::gaggle_last_error();
   return err ? std::string(err) : std::string("unknown error");
 }
 
@@ -53,15 +53,15 @@ static void SetAutoloadDir(DataChunk &args, ExpressionState &state, Vector &resu
     throw InvalidInputException("Path cannot be NULL");
   }
   std::string path_str = path_val.ToString();
-  char *result_json_c = infera::infera_set_autoload_dir(path_str.c_str());
+  char *result_json_c = gaggle::gaggle_set_autoload_dir(path_str.c_str());
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, result_json_c);
   ConstantVector::SetNull(result, false);
-  infera::infera_free(result_json_c);
+  gaggle::gaggle_free(result_json_c);
 }
 
 /**
- * @brief Implements the `infera_get_version()` SQL function.
+ * @brief Implements the `gaggle_get_version()` SQL function.
  *
  * Fetches version and build information from the Rust core and returns it as a
  * JSON string.
@@ -71,15 +71,15 @@ static void SetAutoloadDir(DataChunk &args, ExpressionState &state, Vector &resu
  * @param result The result vector to populate.
  */
 static void GetVersion(DataChunk &args, ExpressionState &state, Vector &result) {
-  char *info_json_c = infera::infera_get_version();
+  char *info_json_c = gaggle::gaggle_get_version();
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, info_json_c);
   ConstantVector::SetNull(result, false);
-  infera::infera_free(info_json_c);
+  gaggle::gaggle_free(info_json_c);
 }
 
 /**
- * @brief Implements the `infera_load_model(name, path)` SQL function.
+ * @brief Implements the `gaggle_load_model(name, path)` SQL function.
  *
  * Takes a model name and a file path/URL, passing them to the Rust core to
  * load an ONNX model.
@@ -90,7 +90,7 @@ static void GetVersion(DataChunk &args, ExpressionState &state, Vector &result) 
  */
 static void LoadModel(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 2) {
-    throw InvalidInputException("infera_load_model(model_name, path) expects exactly 2 arguments");
+    throw InvalidInputException("gaggle_load_model(model_name, path) expects exactly 2 arguments");
   }
   if (args.size() == 0) { return; }
   auto model_name = args.data[0].GetValue(0);
@@ -103,10 +103,10 @@ static void LoadModel(DataChunk &args, ExpressionState &state, Vector &result) {
   if (model_name_str.empty()) {
     throw InvalidInputException("Model name cannot be empty");
   }
-  int rc = infera::infera_load_model(model_name_str.c_str(), path_str.c_str());
+  int rc = gaggle::gaggle_load_model(model_name_str.c_str(), path_str.c_str());
   bool success = rc == 0;
   if (!success) {
-    throw InvalidInputException("Failed to load model '" + model_name_str + "': " + GetInferaError());
+    throw InvalidInputException("Failed to load model '" + model_name_str + "': " + GetGaggleError());
   }
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<bool>(result)[0] = success;
@@ -114,9 +114,9 @@ static void LoadModel(DataChunk &args, ExpressionState &state, Vector &result) {
 }
 
 /**
- * @brief Implements the `infera_unload_model(name)` SQL function.
+ * @brief Implements the `gaggle_unload_model(name)` SQL function.
  *
- * Unloads a model from the Infera engine by its name.
+ * Unloads a model from the Gaggle engine by its name.
  *
  * @param args The input arguments from DuckDB.
  * @param state The expression state.
@@ -124,7 +124,7 @@ static void LoadModel(DataChunk &args, ExpressionState &state, Vector &result) {
  */
 static void UnloadModel(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("infera_unload_model(model_name) expects exactly 1 argument");
+    throw InvalidInputException("gaggle_unload_model(model_name) expects exactly 1 argument");
   }
   if (args.size() == 0) { return; }
   auto model_name = args.data[0].GetValue(0);
@@ -132,9 +132,9 @@ static void UnloadModel(DataChunk &args, ExpressionState &state, Vector &result)
     throw InvalidInputException("Model name cannot be NULL");
   }
   std::string model_name_str = model_name.ToString();
-  int rc = infera::infera_unload_model(model_name_str.c_str());
+  int rc = gaggle::gaggle_unload_model(model_name_str.c_str());
   if (rc != 0) {
-    std::string err = GetInferaError();
+    std::string err = GetGaggleError();
     // Treat model-not-found as benign idempotent success returning true
     if (err.rfind("Model not found:", 0) != 0) {
       throw InvalidInputException("Failed to unload model '" + model_name_str + "': " + err);
@@ -206,7 +206,7 @@ static std::string ValidateAndGetModelName(DataChunk &args, const std::string &f
 }
 
 /**
- * @brief Implements the `infera_predict(name, ...features)` SQL function.
+ * @brief Implements the `gaggle_predict(name, ...features)` SQL function.
  *
  * Extracts features, runs inference using the Rust core, and populates the
  * result vector with a single float prediction per row.
@@ -217,7 +217,7 @@ static std::string ValidateAndGetModelName(DataChunk &args, const std::string &f
  */
 static void Predict(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.size() == 0) { return; }
-  std::string model_name_str = ValidateAndGetModelName(args, "infera_predict");
+  std::string model_name_str = ValidateAndGetModelName(args, "gaggle_predict");
 
   const idx_t batch_size = args.size();
   const idx_t feature_count = args.ColumnCount() - 1;
@@ -225,14 +225,14 @@ static void Predict(DataChunk &args, ExpressionState &state, Vector &result) {
   std::vector<float> features;
   ExtractFeatures(args, features);
 
-  infera::InferaInferenceResult res = infera::infera_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
+  gaggle::GaggleInferenceResult res = gaggle::gaggle_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
   if (res.status != 0) {
-    infera::infera_free_result(res);
-    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetInferaError());
+    gaggle::gaggle_free_result(res);
+    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetGaggleError());
   }
   if (res.rows != batch_size || res.cols != 1) {
     std::string err_msg = StringUtil::Format("Model output shape mismatch. Expected (%d, 1), but got (%d, %d).", batch_size, res.rows, res.cols);
-    infera::infera_free_result(res);
+    gaggle::gaggle_free_result(res);
     throw InvalidInputException(err_msg);
   }
   result.SetVectorType(VectorType::FLAT_VECTOR);
@@ -240,11 +240,11 @@ static void Predict(DataChunk &args, ExpressionState &state, Vector &result) {
   for (idx_t i = 0; i < batch_size; i++) {
     result_data[i] = res.data[i];
   }
-  infera::infera_free_result(res);
+  gaggle::gaggle_free_result(res);
 }
 
 /**
- * @brief Implements the `infera_predict_from_blob(name, blob)` SQL function.
+ * @brief Implements the `gaggle_predict_from_blob(name, blob)` SQL function.
  *
  * Runs inference on raw blob data. The result is a list of floats.
  *
@@ -254,7 +254,7 @@ static void Predict(DataChunk &args, ExpressionState &state, Vector &result) {
  */
 static void PredictFromBlob(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 2) {
-    throw InvalidInputException("infera_predict_from_blob(model_name, input_blob) requires 2 arguments");
+    throw InvalidInputException("gaggle_predict_from_blob(model_name, input_blob) requires 2 arguments");
   }
   if (args.size() == 0) { return; }
   result.SetVectorType(VectorType::FLAT_VECTOR);
@@ -269,10 +269,10 @@ static void PredictFromBlob(DataChunk &args, ExpressionState &state, Vector &res
     string_t blob_str_t = blob_val.GetValueUnsafe<string_t>();
     auto blob_ptr = reinterpret_cast<const uint8_t *>(blob_str_t.GetDataUnsafe());
     auto blob_len = blob_str_t.GetSize();
-    infera::InferaInferenceResult res = infera::infera_predict_from_blob(model_name_str.c_str(), blob_ptr, blob_len);
+    gaggle::GaggleInferenceResult res = gaggle::gaggle_predict_from_blob(model_name_str.c_str(), blob_ptr, blob_len);
     if (res.status != 0) {
-      infera::infera_free_result(res);
-      throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetInferaError());
+      gaggle::gaggle_free_result(res);
+      throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetGaggleError());
     }
     std::vector<Value> elems;
     elems.reserve(res.len);
@@ -280,13 +280,13 @@ static void PredictFromBlob(DataChunk &args, ExpressionState &state, Vector &res
       elems.emplace_back(Value::FLOAT(res.data[j]));
     }
     result.SetValue(i, Value::LIST(std::move(elems)));
-    infera::infera_free_result(res);
+    gaggle::gaggle_free_result(res);
   }
   result.Verify(args.size());
 }
 
 /**
- * @brief Implements the `infera_get_loaded_models()` SQL function.
+ * @brief Implements the `gaggle_get_loaded_models()` SQL function.
  *
  * Returns a JSON array of the names of all currently loaded models.
  *
@@ -295,16 +295,16 @@ static void PredictFromBlob(DataChunk &args, ExpressionState &state, Vector &res
  * @param result The result vector to populate.
  */
 static void GetLoadedModels(DataChunk &args, ExpressionState &state, Vector &result) {
-  char *models_json = infera::infera_get_loaded_models();
+  char *models_json = gaggle::gaggle_get_loaded_models();
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, models_json);
   ConstantVector::SetNull(result, false);
-  infera::infera_free(models_json);
+  gaggle::gaggle_free(models_json);
 }
 
 static void IsModelLoaded(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("infera_is_model_loaded(model_name) expects exactly 1 argument");
+    throw InvalidInputException("gaggle_is_model_loaded(model_name) expects exactly 1 argument");
   }
   if (args.size() == 0) { return; }
   auto model_name_val = args.data[0].GetValue(0);
@@ -312,9 +312,9 @@ static void IsModelLoaded(DataChunk &args, ExpressionState &state, Vector &resul
     throw InvalidInputException("Model name cannot be NULL");
   }
   std::string model_name_str = model_name_val.ToString();
-  char *models_json_c = infera::infera_get_loaded_models();
+  char *models_json_c = gaggle::gaggle_get_loaded_models();
   std::string models_json = models_json_c ? std::string(models_json_c) : std::string();
-  infera::infera_free(models_json_c);
+  gaggle::gaggle_free(models_json_c);
 
   std::string needle = "\"" + model_name_str + "\""; // search for quoted name
   bool found = models_json.find(needle) != std::string::npos;
@@ -325,7 +325,7 @@ static void IsModelLoaded(DataChunk &args, ExpressionState &state, Vector &resul
 }
 
 /**
- * @brief Implements the `infera_predict_multi(name, ...features)` SQL function.
+ * @brief Implements the `gaggle_predict_multi(name, ...features)` SQL function.
  *
  * Similar to `Predict`, but returns the model's output as a JSON-encoded
  * string array, supporting models with multi-value outputs.
@@ -336,7 +336,7 @@ static void IsModelLoaded(DataChunk &args, ExpressionState &state, Vector &resul
  */
 static void PredictMulti(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.size() == 0) { return; }
-  std::string model_name_str = ValidateAndGetModelName(args, "infera_predict_multi");
+  std::string model_name_str = ValidateAndGetModelName(args, "gaggle_predict_multi");
 
   const idx_t batch_size = args.size();
   const idx_t feature_count = args.ColumnCount() - 1;
@@ -344,14 +344,14 @@ static void PredictMulti(DataChunk &args, ExpressionState &state, Vector &result
   std::vector<float> features;
   ExtractFeatures(args, features);
 
-  infera::InferaInferenceResult res = infera::infera_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
+  gaggle::GaggleInferenceResult res = gaggle::gaggle_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
   if (res.status != 0) {
-    infera::infera_free_result(res);
-    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetInferaError());
+    gaggle::gaggle_free_result(res);
+    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetGaggleError());
   }
   if (res.rows != batch_size) {
     std::string err_msg = StringUtil::Format("Model output row count mismatch. Expected %d, but got %d.", batch_size, res.rows);
-    infera::infera_free_result(res);
+    gaggle::gaggle_free_result(res);
     throw InvalidInputException(err_msg);
   }
   result.SetVectorType(VectorType::FLAT_VECTOR);
@@ -369,11 +369,11 @@ static void PredictMulti(DataChunk &args, ExpressionState &state, Vector &result
     oss << "]";
     result_data[row_idx] = StringVector::AddString(result, oss.str());
   }
-  infera::infera_free_result(res);
+  gaggle::gaggle_free_result(res);
 }
 
 /**
- * @brief Implements the `infera_predict_multi_list(name, ...features)` SQL function.
+ * @brief Implements the `gaggle_predict_multi_list(name, ...features)` SQL function.
  *
  * Similar to `PredictMulti`, but returns the model's output as a list of floats
  * instead of a JSON-encoded string.
@@ -384,7 +384,7 @@ static void PredictMulti(DataChunk &args, ExpressionState &state, Vector &result
  */
 static void PredictMultiList(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.size() == 0) { return; }
-  std::string model_name_str = ValidateAndGetModelName(args, "infera_predict_multi_list");
+  std::string model_name_str = ValidateAndGetModelName(args, "gaggle_predict_multi_list");
 
   const idx_t batch_size = args.size();
   const idx_t feature_count = args.ColumnCount() - 1;
@@ -392,14 +392,14 @@ static void PredictMultiList(DataChunk &args, ExpressionState &state, Vector &re
   std::vector<float> features;
   ExtractFeatures(args, features);
 
-  infera::InferaInferenceResult res = infera::infera_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
+  gaggle::GaggleInferenceResult res = gaggle::gaggle_predict(model_name_str.c_str(), features.data(), batch_size, feature_count);
   if (res.status != 0) {
-    infera::infera_free_result(res);
-    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetInferaError());
+    gaggle::gaggle_free_result(res);
+    throw InvalidInputException("Inference failed for model '" + model_name_str + "': " + GetGaggleError());
   }
   if (res.rows != batch_size) {
     std::string err_msg = StringUtil::Format("Model output row count mismatch. Expected %d, but got %d.", batch_size, res.rows);
-    infera::infera_free_result(res);
+    gaggle::gaggle_free_result(res);
     throw InvalidInputException(err_msg);
   }
   result.SetVectorType(VectorType::FLAT_VECTOR);
@@ -412,12 +412,12 @@ static void PredictMultiList(DataChunk &args, ExpressionState &state, Vector &re
     }
     result.SetValue(row_idx, Value::LIST(std::move(elems)));
   }
-  infera::infera_free_result(res);
+  gaggle::gaggle_free_result(res);
   result.Verify(args.size());
 }
 
 /**
- * @brief Implements the `infera_get_model_info(name)` SQL function.
+ * @brief Implements the `gaggle_get_model_info(name)` SQL function.
  *
  * Retrieves metadata for a specific model and returns it as a JSON string.
  *
@@ -427,7 +427,7 @@ static void PredictMultiList(DataChunk &args, ExpressionState &state, Vector &re
  */
 static void GetModelInfo(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("infera_get_model_info(model_name) expects exactly 1 argument");
+    throw InvalidInputException("gaggle_get_model_info(model_name) expects exactly 1 argument");
   }
   if (args.size() == 0) { return; }
   auto model_name = args.data[0].GetValue(0);
@@ -435,12 +435,12 @@ static void GetModelInfo(DataChunk &args, ExpressionState &state, Vector &result
     throw InvalidInputException("Model name cannot be NULL");
   }
   std::string model_name_str = model_name.ToString();
-  char *json_meta_c = infera::infera_get_model_info(model_name_str.c_str());
+  char *json_meta_c = gaggle::gaggle_get_model_info(model_name_str.c_str());
 
   // Convert to std::string and free the C string immediately to avoid leaks
   std::string json_meta = json_meta_c ? std::string(json_meta_c) : std::string();
   if (json_meta_c) {
-    infera::infera_free(json_meta_c);
+    gaggle::gaggle_free(json_meta_c);
   }
 
   // If Rust returned an error JSON, surface it as a DuckDB error per contract/tests
@@ -454,7 +454,7 @@ static void GetModelInfo(DataChunk &args, ExpressionState &state, Vector &result
 }
 
 /**
- * @brief Implements the `infera_clear_cache()` SQL function.
+ * @brief Implements the `gaggle_clear_cache()` SQL function.
  *
  * Clears the entire model cache directory, freeing up disk space.
  *
@@ -463,10 +463,10 @@ static void GetModelInfo(DataChunk &args, ExpressionState &state, Vector &result
  * @param result The result vector to populate.
  */
 static void ClearCache(DataChunk &args, ExpressionState &state, Vector &result) {
-  int rc = infera::infera_clear_cache();
+  int rc = gaggle::gaggle_clear_cache();
   bool success = rc == 0;
   if (!success) {
-    throw InvalidInputException("Failed to clear cache: " + GetInferaError());
+    throw InvalidInputException("Failed to clear cache: " + GetGaggleError());
   }
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<bool>(result)[0] = success;
@@ -474,7 +474,7 @@ static void ClearCache(DataChunk &args, ExpressionState &state, Vector &result) 
 }
 
 /**
- * @brief Implements the `infera_get_cache_info()` SQL function.
+ * @brief Implements the `gaggle_get_cache_info()` SQL function.
  *
  * Returns cache statistics as a JSON string.
  *
@@ -483,15 +483,15 @@ static void ClearCache(DataChunk &args, ExpressionState &state, Vector &result) 
  * @param result The result vector to populate.
  */
 static void GetCacheInfo(DataChunk &args, ExpressionState &state, Vector &result) {
-  char *cache_info_json = infera::infera_get_cache_info();
+  char *cache_info_json = gaggle::gaggle_get_cache_info();
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
   ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, cache_info_json);
   ConstantVector::SetNull(result, false);
-  infera::infera_free(cache_info_json);
+  gaggle::gaggle_free(cache_info_json);
 }
 
 /**
- * @brief Registers all the Infera functions with DuckDB.
+ * @brief Registers all the Gaggle functions with DuckDB.
  *
  * This internal helper function is called by the extension loading mechanism to
  * register all scalar functions.
@@ -499,8 +499,8 @@ static void GetCacheInfo(DataChunk &args, ExpressionState &state, Vector &result
  * @param loader The extension loader provided by DuckDB.
  */
 static void LoadInternal(ExtensionLoader &loader) {
-  loader.RegisterFunction(ScalarFunction("infera_load_model", {LogicalType::VARCHAR, LogicalType::VARCHAR}, LogicalType::BOOLEAN, LoadModel));
-  loader.RegisterFunction(ScalarFunction("infera_unload_model", {LogicalType::VARCHAR}, LogicalType::BOOLEAN, UnloadModel));
+  loader.RegisterFunction(ScalarFunction("gaggle_load_model", {LogicalType::VARCHAR, LogicalType::VARCHAR}, LogicalType::BOOLEAN, LoadModel));
+  loader.RegisterFunction(ScalarFunction("gaggle_unload_model", {LogicalType::VARCHAR}, LogicalType::BOOLEAN, UnloadModel));
 
   const idx_t MAX_FEATURES = 127;
   for (idx_t feature_count = 1; feature_count <= MAX_FEATURES; feature_count++) {
@@ -510,38 +510,38 @@ static void LoadInternal(ExtensionLoader &loader) {
     for (idx_t i = 0; i < feature_count; i++) {
       arg_types.push_back(LogicalType::FLOAT);
     }
-    loader.RegisterFunction(ScalarFunction("infera_predict", arg_types, LogicalType::FLOAT, Predict));
-    loader.RegisterFunction(ScalarFunction("infera_predict_multi", arg_types, LogicalType::VARCHAR, PredictMulti));
-    loader.RegisterFunction(ScalarFunction("infera_predict_multi_list", arg_types, LogicalType::LIST(LogicalType::FLOAT), PredictMultiList));
+    loader.RegisterFunction(ScalarFunction("gaggle_predict", arg_types, LogicalType::FLOAT, Predict));
+    loader.RegisterFunction(ScalarFunction("gaggle_predict_multi", arg_types, LogicalType::VARCHAR, PredictMulti));
+    loader.RegisterFunction(ScalarFunction("gaggle_predict_multi_list", arg_types, LogicalType::LIST(LogicalType::FLOAT), PredictMultiList));
   }
 
-  loader.RegisterFunction(ScalarFunction("infera_predict_from_blob", {LogicalType::VARCHAR, LogicalType::BLOB}, LogicalType::LIST(LogicalType::FLOAT), PredictFromBlob));
-  loader.RegisterFunction(ScalarFunction("infera_get_loaded_models", {}, LogicalType::VARCHAR, GetLoadedModels));
-  loader.RegisterFunction(ScalarFunction("infera_get_model_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR, GetModelInfo));
-  loader.RegisterFunction(ScalarFunction("infera_get_version", {}, LogicalType::VARCHAR, GetVersion));
-  loader.RegisterFunction(ScalarFunction("infera_set_autoload_dir", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SetAutoloadDir));
-  loader.RegisterFunction(ScalarFunction("infera_is_model_loaded", {LogicalType::VARCHAR}, LogicalType::BOOLEAN, IsModelLoaded));
-  loader.RegisterFunction(ScalarFunction("infera_clear_cache", {}, LogicalType::BOOLEAN, ClearCache));
-  loader.RegisterFunction(ScalarFunction("infera_get_cache_info", {}, LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(ScalarFunction("gaggle_predict_from_blob", {LogicalType::VARCHAR, LogicalType::BLOB}, LogicalType::LIST(LogicalType::FLOAT), PredictFromBlob));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_loaded_models", {}, LogicalType::VARCHAR, GetLoadedModels));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_model_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR, GetModelInfo));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_version", {}, LogicalType::VARCHAR, GetVersion));
+  loader.RegisterFunction(ScalarFunction("gaggle_set_autoload_dir", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SetAutoloadDir));
+  loader.RegisterFunction(ScalarFunction("gaggle_is_model_loaded", {LogicalType::VARCHAR}, LogicalType::BOOLEAN, IsModelLoaded));
+  loader.RegisterFunction(ScalarFunction("gaggle_clear_cache", {}, LogicalType::BOOLEAN, ClearCache));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_cache_info", {}, LogicalType::VARCHAR, GetCacheInfo));
 }
 
-void InferaExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
-std::string InferaExtension::Name() { return "infera"; }
-std::string InferaExtension::Version() const { return "v0.3.0"; }
+void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
+std::string GaggleExtension::Name() { return "gaggle"; }
+std::string GaggleExtension::Version() const { return "v0.3.0"; }
 
 } // namespace duckdb
 
 extern "C" {
 // Exported entry point expected by DuckDB when loading a C++ loadable extension.
-// The build system passes -Wl,-exported_symbol,_infera_duckdb_cpp_init so this
+// The build system passes -Wl,-exported_symbol,_gaggle_duckdb_cpp_init so this
 // symbol MUST exist with C linkage.
-DUCKDB_EXTENSION_API void infera_duckdb_cpp_init(duckdb::ExtensionLoader &loader) {
+DUCKDB_EXTENSION_API void gaggle_duckdb_cpp_init(duckdb::ExtensionLoader &loader) {
   duckdb::LoadInternal(loader);
 }
 
 // Legacy/alternative entry point used by some tooling paths.
-DUCKDB_EXTENSION_API void infera_init(duckdb::DatabaseInstance &db) {
-  duckdb::ExtensionLoader loader(db, "infera");
+DUCKDB_EXTENSION_API void gaggle_init(duckdb::DatabaseInstance &db) {
+  duckdb::ExtensionLoader loader(db, "gaggle");
   duckdb::LoadInternal(loader);
 }
 }

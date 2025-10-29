@@ -6,25 +6,25 @@
 namespace duckdb {
 
 /**
- * @brief The InferaExtension class is the main entry point for the Infera DuckDB extension.
+ * @brief The GaggleExtension class is the main entry point for the Gaggle DuckDB extension.
  *
  * This class is responsible for loading the extension, providing its name, and its version.
  * It inherits from the `duckdb::Extension` base class.
  */
-class InferaExtension : public Extension {
+class GaggleExtension : public Extension {
 public:
   /**
    * @brief Loads the extension's functions into the DuckDB instance.
    *
    * This method is called by DuckDB when the extension is loaded. It registers
-   * all the custom scalar and table functions provided by Infera.
+   * all the custom scalar and table functions provided by Gaggle.
    * @param loader The extension loader provided by DuckDB.
    */
   void Load(ExtensionLoader &loader) override;
 
   /**
    * @brief Returns the name of the extension.
-   * @return The string "infera".
+   * @return The string "gaggle".
    */
   std::string Name() override;
 

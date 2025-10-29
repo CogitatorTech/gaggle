@@ -3,7 +3,7 @@
 # ==============================================================================
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 EXT_NAME := gaggle
-RUST_LIB := infera/target/release/$(EXT_NAME).a
+RUST_LIB := gaggle/target/release/$(EXT_NAME).a
 DUCKDB_SRCDIR := ./external/duckdb/
 EXT_CONFIG := ${PROJ_DIR}extension_config.cmake
 EXAMPLES_DIR := docs/examples
@@ -34,39 +34,39 @@ help: ## Show the help messages for all targets
 # Rust Targets
 # ==============================================================================
 .PHONY: rust-build
-rust-build: ## Build Infera in release mode
-	@echo "Building Infera in release mode..."
-	@cd infera && cargo build --release --features "duckdb_extension,tract"
+rust-build: ## Build Gaggle in release mode
+	@echo "Building Gaggle in release mode..."
+	@cd gaggle && cargo build --release --features "duckdb_extension"
 
 .PHONY: rust-build-debug
-rust-build-debug: ## Build Infera in debug mode
-	@echo "Building Infera in debug mode..."
-	@cd infera && cargo build --features "duckdb_extension,tract"
+rust-build-debug: ## Build Gaggle in debug mode
+	@echo "Building Gaggle in debug mode..."
+	@cd gaggle && cargo build --features "duckdb_extension"
 
 .PHONY: rust-format
 rust-format: ## Format Rust files
 	@echo "Formatting Rust files..."
-	@cargo fmt --manifest-path infera/Cargo.toml
+	@cargo fmt --manifest-path gaggle/Cargo.toml
 
 .PHONY: rust-test
 rust-test: rust-format ## Run tests
-	@echo "Running the unit tests for Infera..."
-	@cargo test --manifest-path infera/Cargo.toml --features "tract" --all-targets -- --nocapture
+	@echo "Running the unit tests for Gaggle..."
+	@cargo test --manifest-path gaggle/Cargo.toml --all-targets -- --nocapture
 
 .PHONY: rust-coverage
-rust-coverage: ## Generate code coverage report for Infera crate
+rust-coverage: ## Generate code coverage report for Gaggle crate
 	@echo "Generating coverage report..."
-	@cargo tarpaulin --manifest-path infera/Cargo.toml --features "tract" --all-targets --out Xml
+	@cargo tarpaulin --manifest-path gaggle/Cargo.toml --all-targets --out Xml
 
 .PHONY: rust-lint
 rust-lint: rust-format ## Run linter checks on Rust files
 	@echo "Linting Rust files..."
-	@cargo clippy --manifest-path infera/Cargo.toml --features "tract" -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+	@cargo clippy --manifest-path gaggle/Cargo.toml -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 .PHONY: rust-fix-lint
 rust-fix-lint: ## Fix Rust linter warnings
 	@echo "Fixing linter warnings..."
-	@cargo clippy --fix --allow-dirty --allow-staged --manifest-path infera/Cargo.toml --features "tract" -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+	@cargo clippy --fix --allow-dirty --allow-staged --manifest-path gaggle/Cargo.toml -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 .PHONY: rust-careful
 careful: ## Run security checks on Rust code
@@ -76,22 +76,22 @@ careful: ## Run security checks on Rust code
 .PHONY: rust-clean
 rust-clean: ## Clean Rust build artifacts
 	@echo "Cleaning Rust build artifacts..."
-	@cd infera && cargo clean
+	@cd gaggle && cargo clean
 
 .PHONY: create-bindings
 create-bindings: ## Generate C bindings from Rust code
-	@echo "Generating C bindings for Infera..."
-	@cd infera && cbindgen --config cbindgen.toml --crate infera --output bindings/include/rust.h
-	@echo "C bindings generated at infera/bindings/include/rust.h"
+	@echo "Generating C bindings for Gaggle..."
+	@cd gaggle && cbindgen --config cbindgen.toml --crate gaggle --output bindings/include/rust.h
+	@echo "C bindings generated at gaggle/bindings/include/rust.h"
 
 # ==============================================================================
 # Targets for Building the Extension
 # ==============================================================================
 # We need to build the DuckDB first, so we can link against it
-# when building the Infera as a DuckDB extension.
+# when building the Gaggle as a DuckDB extension.
 # We normally need to build the DuckDB once only.
 # The `build/{release,debug}` directories will contain the DuckDB build that is staticly linked
-# with the Infera extension. That is used for testing the extension.
+# with the Gaggle extension. That is used for testing the extension.
 
 .PHONY: release
 release: rust-build ## Build the extension in release mode (DuckDB + extension)
@@ -116,7 +116,7 @@ install-deps: ## Set up development environment (for Debian-based systems)
 	@sudo apt-get install -y cmake clang-format snap python3-pip
 	@sudo snap install rustup --classic
 	@cargo install cargo-tarpaulin cbindgen cargo-edit cargo-audit cargo-outdated cargo-careful
-	@cd infera && cargo check --features "tract"
+	@cd gaggle && cargo check --features "tract"
 	@git submodule update --init --recursive
 	@pip install --user --upgrade pip uv
 	@uv sync --extra dev
@@ -144,7 +144,7 @@ check: rust-lint rust-test ## Run all checks (linting and tests)
 	@echo "All checks passed!"
 
 .PHONY: examples
-examples: ## Run SQL examples for Infera extension
+examples: ## Run SQL examples for Gaggle extension
 	@echo "Running the examples in the ${EXAMPLES_DIR} directory..."
 	@for sql_file in $(EXAMPLES_DIR)/*.sql; do \
 		echo "Running example: $$sql_file"; \
