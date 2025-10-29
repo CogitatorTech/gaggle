@@ -1,0 +1,87 @@
+# name: test/sql/test_core_functionality.test
+# group: [infera]
+
+# tests the core, end-to-end functionality of the extension.
+
+statement ok
+pragma enable_verification
+
+# load the infera extension from the local build artifact
+statement ok
+load 'build/release/extension/infera/infera.duckdb_extension'
+
+# test 1: version and initial state
+
+query I
+select infera_get_version() is not null
+----
+true
+
+# infera_get_loaded_models returns a json string; for empty state it is []
+query I
+select infera_get_loaded_models()
+----
+[]
+
+# test 2: local model roundtrip (load -> info -> predict -> unload)
+
+statement ok
+select infera_load_model('linear', 'test/models/linear.onnx')
+
+query I
+select instr(infera_get_loaded_models(), 'linear') > 0
+----
+true
+
+query I
+select infera_get_model_info('linear') is not null
+----
+true
+
+query I
+select position('"input_shape":[1,3]' in infera_get_model_info('linear')) > 0
+----
+true
+
+# run deterministic predictions. model is y = 2*x1 - 1*x2 + 0.5*x3 + 0.25
+# for (1.0, 2.0, 3.0), expected y = 1.75
+query R
+select infera_predict('linear', 1.0, 2.0, 3.0)
+----
+1.75
+
+query I
+select abs(infera_predict('linear', 1.0, 2.0, 3.0) - 1.75) < 1e-5
+----
+true
+
+query I
+select instr(infera_predict_multi('linear', 1.0, 2.0, 3.0), '1.75') > 0
+----
+true
+
+statement ok
+select infera_unload_model('linear')
+
+query I
+select infera_get_loaded_models()
+----
+[]
+
+# test 3: autoload directory
+
+statement ok
+select infera_set_autoload_dir('test/models')
+
+query I
+select instr(infera_get_loaded_models(), 'linear') > 0
+----
+true
+
+query I
+select abs(infera_predict('linear', 1.0, 2.0, 3.0) - 1.75) < 1e-5
+----
+true
+
+statement ok
+select infera_unload_model('linear')
