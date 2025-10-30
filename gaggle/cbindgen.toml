@@ -43,6 +43,7 @@ include = [
     "gaggle_free",
     "gaggle_clear_cache",
     "gaggle_get_cache_info",
+    "gaggle_json_each",
     "gaggle_last_error"
 ]
 

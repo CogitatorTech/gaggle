@@ -1,6 +1,5 @@
 // Kaggle API client implementation
 
-use crate::config::CONFIG;
 use crate::error::GaggleError;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -8,6 +7,8 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::env;
 
 /// Kaggle API credentials stored in memory
 static CREDENTIALS: Lazy<RwLock<Option<KaggleCredentials>>> = Lazy::new(|| RwLock::new(None));
@@ -108,13 +109,32 @@ pub fn parse_dataset_path(path: &str) -> Result<(String, String), GaggleError> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
+/// Helper: get API base URL (overridable at runtime via env for testing)
+fn get_api_base() -> String {
+    env::var("GAGGLE_API_BASE").unwrap_or_else(|_| "https://www.kaggle.com/api/v1".to_string())
+}
+
+/// Helper: build a reqwest client with timeout and UA
+fn build_client() -> Result<Client, GaggleError> {
+    let timeout = Duration::from_secs(crate::config::http_timeout_runtime_secs());
+    let ua = format!(
+        "Gaggle/{} (+https://github.com/CogitatorTech/gaggle)",
+        env!("CARGO_PKG_VERSION")
+    );
+    Ok(
+        reqwest::blocking::ClientBuilder::new()
+            .timeout(timeout)
+            .user_agent(ua)
+            .build()?
+    )
+}
+
 /// Download a Kaggle dataset
 pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     let creds = get_credentials()?;
     let (owner, dataset) = parse_dataset_path(dataset_path)?;
 
-    let cache_dir = CONFIG
-        .cache_dir
+    let cache_dir = crate::config::cache_dir_runtime()
         .join("datasets")
         .join(&owner)
         .join(&dataset);
@@ -128,11 +148,11 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
 
     // Download using Kaggle API
     let url = format!(
-        "https://www.kaggle.com/api/v1/datasets/download/{}/{}",
-        owner, dataset
+        "{}/datasets/download/{}/{}",
+        get_api_base(), owner, dataset
     );
 
-    let client = Client::new();
+    let client = build_client()?;
     let response = client
         .get(&url)
         .basic_auth(&creds.username, Some(&creds.key))
@@ -243,13 +263,14 @@ pub fn search_datasets(
     let creds = get_credentials()?;
 
     let url = format!(
-        "https://www.kaggle.com/api/v1/datasets/list?search={}&page={}&pageSize={}",
+        "{}/datasets/list?search={}&page={}&pageSize={}",
+        get_api_base(),
         urlencoding::encode(query),
         page,
         page_size
     );
 
-    let client = Client::new();
+    let client = build_client()?;
     let response = client
         .get(&url)
         .basic_auth(&creds.username, Some(&creds.key))
@@ -272,11 +293,11 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
     let (owner, dataset) = parse_dataset_path(dataset_path)?;
 
     let url = format!(
-        "https://www.kaggle.com/api/v1/datasets/view/{}/{}",
-        owner, dataset
+        "{}/datasets/view/{}/{}",
+        get_api_base(), owner, dataset
     );
 
-    let client = Client::new();
+    let client = build_client()?;
     let response = client
         .get(&url)
         .basic_auth(&creds.username, Some(&creds.key))
@@ -296,6 +317,9 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+    use std::io::Write;
+    use mockito::{Server as MockServer, Matcher};
 
     #[test]
     fn test_kaggle_credentials_struct() {
@@ -556,5 +580,115 @@ mod tests {
         // This should fail because of too many parts
         let result = parse_dataset_path("owner/dataset/withslash");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_search_datasets_with_mock_server() {
+        let _ = set_credentials("testuser", "testkey");
+
+        let mut server = MockServer::new();
+        let _m = server
+            .mock("GET", "/datasets/list")
+            .match_query(Matcher::Any)
+            .with_status(200)
+            .with_body("[]")
+            .create();
+
+        env::set_var("GAGGLE_API_BASE", server.url());
+        let res = search_datasets("test", 1, 10);
+        env::remove_var("GAGGLE_API_BASE");
+
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_array());
+    }
+
+    #[test]
+    fn test_get_dataset_metadata_with_mock_server() {
+        let _ = set_credentials("testuser", "testkey");
+
+        let mut server = MockServer::new();
+        let _m = server
+            .mock("GET", "/datasets/view/owner/dataset")
+            .with_status(200)
+            .with_body(serde_json::json!({"ref":"owner/dataset"}).to_string())
+            .create();
+
+        env::set_var("GAGGLE_API_BASE", server.url());
+        let res = get_dataset_metadata("owner/dataset");
+        env::remove_var("GAGGLE_API_BASE");
+
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap()["ref"], "owner/dataset");
+    }
+
+    #[test]
+    fn test_download_dataset_with_mock_zip() {
+        let _ = set_credentials("testuser", "testkey");
+
+        // Prepare a small zip in memory
+        let mut zip_buf: Vec<u8> = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut zip_buf);
+            let mut zipw = zip::ZipWriter::new(cursor);
+            let options = zip::write::SimpleFileOptions::default();
+            zipw.start_file("file.txt", options).unwrap();
+            zipw.write_all(b"hello world").unwrap();
+            zipw.finish().unwrap();
+        }
+
+        let mut server = MockServer::new();
+        let _m = server
+            .mock("GET", "/datasets/download/owner/dataset")
+            .with_status(200)
+            .with_body(zip_buf.clone())
+            .create();
+
+        // Use temp cache dir
+        let tempdir = tempfile::TempDir::new().unwrap();
+        env::set_var("GAGGLE_CACHE_DIR", tempdir.path());
+        env::set_var("GAGGLE_API_BASE", server.url());
+
+        let res = download_dataset("owner/dataset");
+
+        env::remove_var("GAGGLE_API_BASE");
+        env::remove_var("GAGGLE_CACHE_DIR");
+
+        assert!(res.is_ok());
+        let dir = res.unwrap();
+        assert!(dir.join("file.txt").exists());
+        assert!(dir.join(".downloaded").exists());
+    }
+
+    #[test]
+    fn test_http_timeout_respected() {
+        let _ = set_credentials("testuser", "testkey");
+
+        // Use tiny_http to delay response
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let addr = server.server_addr();
+        let base = format!("http://{}", addr);
+
+        let handle = thread::spawn(move || {
+            if let Ok(mut req) = server.recv() {
+                // Delay longer than timeout
+                std::thread::sleep(Duration::from_millis(2200));
+                let _ = req.respond(tiny_http::Response::from_string("[]").with_status_code(200));
+            }
+        });
+
+        env::set_var("GAGGLE_API_BASE", base);
+        env::set_var("GAGGLE_HTTP_TIMEOUT", "1");
+
+        let start = std::time::Instant::now();
+        let res = search_datasets("slow", 1, 10);
+        let elapsed = start.elapsed();
+
+        env::remove_var("GAGGLE_API_BASE");
+        env::remove_var("GAGGLE_HTTP_TIMEOUT");
+        handle.join().unwrap();
+
+        assert!(res.is_err());
+        // Should not hang for long
+        assert!(elapsed.as_secs() <= 5);
     }
 }

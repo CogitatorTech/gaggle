@@ -151,3 +151,8 @@ examples: ## Run SQL examples for Gaggle extension
 		./build/release/duckdb < $$sql_file; \
 		echo "============================================================================"; \
 	done
+
+.PHONY: itest
+itest: release ## Run Python integration test against built DuckDB shell
+	@echo "Running integration tests..."
+	@uv run -q python3 test/integration/test_duckdb_integration.py

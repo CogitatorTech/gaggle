@@ -346,6 +346,119 @@ fn calculate_dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
     Ok(total)
 }
 
+/// Parse JSON and expand objects/arrays similar to json_each
+///
+/// # Arguments
+///
+/// * `json_str` - A pointer to a null-terminated C string containing JSON data
+///
+/// # Returns
+///
+/// A pointer to a null-terminated C string containing newline-delimited JSON objects
+/// representing each key-value pair (for objects) or each element (for arrays).
+/// Each line is a JSON object with "key", "value", "type", and "path" fields.
+/// The caller must free this pointer using `gaggle_free()`.
+///
+/// # Safety
+///
+/// * The `json_str` pointer must not be null.
+/// * The memory pointed to by `json_str` must be a valid, null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_char {
+    let result = (|| -> Result<String, error::GaggleError> {
+        if json_str.is_null() {
+            return Err(error::GaggleError::NullPointer);
+        }
+        let json_cstr = CStr::from_ptr(json_str).to_str()?;
+
+        // Parse the JSON
+        let value: serde_json::Value = serde_json::from_str(json_cstr)?;
+
+        // Expand into rows
+        let mut rows = Vec::new();
+        expand_json_value(&value, "$", &mut rows);
+
+        // Convert rows to newline-delimited JSON
+        let result_str = rows
+            .into_iter()
+            .map(|row| row.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Ok(result_str)
+    })();
+
+    match result {
+        Ok(s) => string_to_c_string(s),
+        Err(e) => {
+            error::set_last_error(&e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Helper function to recursively expand JSON values
+fn expand_json_value(
+    value: &serde_json::Value,
+    path: &str,
+    rows: &mut Vec<serde_json::Value>,
+) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, val) in map.iter() {
+                let new_path = if path == "$" {
+                    format!("$.{}", key)
+                } else {
+                    format!("{}.{}", path, key)
+                };
+
+                let row = json!({
+                    "key": key,
+                    "value": val,
+                    "type": get_json_type(val),
+                    "path": new_path
+                });
+                rows.push(row);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for (idx, val) in arr.iter().enumerate() {
+                let new_path = format!("{}[{}]", path, idx);
+
+                let row = json!({
+                    "key": idx,
+                    "value": val,
+                    "type": get_json_type(val),
+                    "path": new_path
+                });
+                rows.push(row);
+            }
+        }
+        _ => {
+            // For scalar values, return as is
+            let row = json!({
+                "key": null,
+                "value": value,
+                "type": get_json_type(value),
+                "path": path
+            });
+            rows.push(row);
+        }
+    }
+}
+
+/// Helper function to get JSON type as string
+fn get_json_type(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

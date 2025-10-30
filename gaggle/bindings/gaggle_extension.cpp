@@ -12,6 +12,10 @@
 #include "duckdb/main/extension/extension_loader.hpp"
 #include "duckdb/parser/parsed_data/create_pragma_function_info.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
+#include "duckdb/parser/tableref/table_function_ref.hpp"
+#include "duckdb/parser/expression/function_expression.hpp"
+#include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/main/config.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -284,35 +288,81 @@ static void KaggleReadFunction(ClientContext &context,
 }
 
 static unique_ptr<TableRef> KaggleReplacementScan(ClientContext &context,
-                                                  const string &table_name,
-                                                  ReplacementScanData *data) {
-  // Check if table_name starts with "kaggle:"
-  if (!StringUtil::StartsWith(table_name, "kaggle:")) {
-    return nullptr;
+                                                  ReplacementScanInput &input,
+                                                  optional_ptr<ReplacementScanData> data) {
+   // Check if table_name starts with "kaggle:"
+   const string &table_name = input.table_name;
+   if (!StringUtil::StartsWith(table_name, "kaggle:")) {
+     return nullptr;
+   }
+
+   // Parse kaggle:owner/dataset/file.ext
+   string kaggle_ref = table_name.substr(7); // Remove "kaggle:" prefix
+   auto last_slash = kaggle_ref.find_last_of('/');
+   if (last_slash == string::npos) {
+     return nullptr;
+   }
+
+   string dataset_path = kaggle_ref.substr(0, last_slash);
+   string filename = kaggle_ref.substr(last_slash + 1);
+
+   // Get the local file path
+   char *file_path_c = gaggle_get_file_path(dataset_path.c_str(), filename.c_str());
+   if (file_path_c == nullptr) {
+     return nullptr;
+   }
+   string local_path(file_path_c);
+   gaggle_free(file_path_c);
+
+   // Decide which reader to use based on extension
+   string func_name = "read_csv_auto";
+   auto lower_name = StringUtil::Lower(filename);
+   if (StringUtil::EndsWith(lower_name, ".parquet") || StringUtil::EndsWith(lower_name, ".parq")) {
+     func_name = "read_parquet";
+   }
+
+   // Construct a table function call: func_name(local_path)
+   vector<unique_ptr<ParsedExpression>> children;
+   children.push_back(make_uniq<ConstantExpression>(Value(local_path)));
+   auto func_expr = make_uniq<FunctionExpression>(func_name, std::move(children));
+
+   // Create a TableFunctionRef manually
+   auto table_func_ref = make_uniq<TableFunctionRef>();
+   table_func_ref->function = std::move(func_expr);
+   return std::move(table_func_ref);
+}
+
+
+/**
+ * @brief Implements the `gaggle_json_each(json)` SQL function.
+ * Returns newline-delimited JSON rows that can be parsed with DuckDB's JSON functions.
+ */
+static void JsonEach(DataChunk &args, ExpressionState &state, Vector &result) {
+  if (args.ColumnCount() != 1) {
+    throw InvalidInputException(
+        "gaggle_json_each(json) expects exactly 1 argument");
+  }
+  if (args.size() == 0) {
+    return;
   }
 
-  // Parse kaggle:owner/dataset/file.csv
-  string kaggle_ref = table_name.substr(7); // Remove "kaggle:" prefix
-  auto last_slash = kaggle_ref.find_last_of('/');
-  if (last_slash == string::npos) {
-    return nullptr;
+  auto json_val = args.data[0].GetValue(0);
+  if (json_val.IsNull()) {
+    throw InvalidInputException("JSON input cannot be NULL");
   }
 
-  string dataset_path = kaggle_ref.substr(0, last_slash);
-  string filename = kaggle_ref.substr(last_slash + 1);
+  std::string json_str = json_val.ToString();
+  char *result_str = gaggle_json_each(json_str.c_str());
 
-  // Get the local file path
-  char *file_path =
-      gaggle_get_file_path(dataset_path.c_str(), filename.c_str());
-  if (file_path == nullptr) {
-    return nullptr;
+  if (result_str == nullptr) {
+    throw InvalidInputException("Failed to parse JSON: " + GetGaggleError());
   }
 
-  string local_path = std::string(file_path);
-  gaggle_free(file_path);
-
-  // Return nullptr for now - replacement scan not fully implemented
-  return nullptr;
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, result_str);
+  ConstantVector::SetNull(result, false);
+  gaggle_free(result_str);
 }
 
 /**
@@ -341,25 +391,28 @@ static void LoadInternal(ExtensionLoader &loader) {
                                          LogicalType::BOOLEAN, ClearCache));
   loader.RegisterFunction(ScalarFunction("gaggle_get_cache_info", {},
                                          LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(ScalarFunction("gaggle_json_each",
+                                         {LogicalType::VARCHAR},
+                                         LogicalType::VARCHAR, JsonEach));
 
-  // Register replacement scan for "kaggle:" prefix
-  // This allows: SELECT * FROM 'kaggle:owner/dataset/file.csv'
-  // TODO: Implement replacement scan properly
-  // loader.config.replacement_scans.emplace_back(KaggleReplacementScan);
+  // Register replacement scan for "kaggle:" prefix via DBConfig
+  auto &db = loader.GetDatabaseInstance();
+  auto &config = DBConfig::GetConfig(db);
+  config.replacement_scans.emplace_back(KaggleReplacementScan);
+}
+
+// Define C++ extension entrypoint for dynamic loading
+DUCKDB_CPP_EXTENSION_ENTRY(gaggle, loader) {
+  duckdb::LoadInternal(loader);
 }
 
 void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
 std::string GaggleExtension::Name() { return "gaggle"; }
-std::string GaggleExtension::Version() const { return "v0.3.0"; }
+std::string GaggleExtension::Version() const { return "v0.1.0"; }
 
 } // namespace duckdb
 
 extern "C" {
-DUCKDB_EXTENSION_API void
-gaggle_duckdb_cpp_init(duckdb::ExtensionLoader &loader) {
-  duckdb::LoadInternal(loader);
-}
-
 DUCKDB_EXTENSION_API void gaggle_init(duckdb::DatabaseInstance &db) {
   duckdb::ExtensionLoader loader(db, "gaggle");
   duckdb::LoadInternal(loader);

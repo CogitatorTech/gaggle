@@ -5,10 +5,10 @@ The table below includes the information about all SQL functions exposed by Gagg
 | # | Function                                                | Return Type      | Description                                                                         |
 |---|:--------------------------------------------------------|:-----------------|:------------------------------------------------------------------------------------|
 | 1 | `gaggle_set_credentials(username VARCHAR, key VARCHAR)` | `BOOLEAN`        | Sets Kaggle API credentials for the session. Returns `true` on success.             |
-| 2 | `gaggle_search_datasets(query VARCHAR)`                 | `VARCHAR (JSON)` | Searches Kaggle for datasets matching the query and returns results as JSON.        |
-| 3 | `gaggle_get_dataset_files(dataset_path VARCHAR)`        | `VARCHAR (JSON)` | Lists all files in a Kaggle dataset (format: 'owner/dataset-name').                 |
-| 4 | `gaggle_download_dataset(dataset_path VARCHAR)`         | `VARCHAR`        | Downloads a Kaggle dataset and returns the local cache directory path.              |
-| 5 | `gaggle_get_dataset_metadata(dataset_path VARCHAR)`     | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info. |
+| 2 | `gaggle_search(query VARCHAR, page INTEGER, page_size INTEGER)` | `VARCHAR (JSON)` | Searches Kaggle for datasets matching the query and returns results as JSON.        |
+| 3 | `gaggle_list_files(dataset_path VARCHAR)`        | `VARCHAR (JSON)` | Lists all files in a Kaggle dataset (format: 'owner/dataset-name').                 |
+| 4 | `gaggle_download(dataset_path VARCHAR)`         | `VARCHAR`        | Downloads a Kaggle dataset and returns the local cache directory path.              |
+| 5 | `gaggle_info(dataset_path VARCHAR)`     | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info. |
 
 > [!NOTE]
 > Kaggle credentials can be provided via environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`),
@@ -34,11 +34,11 @@ select gaggle_set_credentials('your-username', 'your-api-key');
 
 ```sql
 -- Search for datasets matching a query
-select gaggle_search_datasets('housing');
+select gaggle_search('housing', 1, 10);
 -- Returns JSON with matching datasets
 
 -- Get metadata about a specific dataset
-select gaggle_get_dataset_metadata('username/dataset-name');
+select gaggle_info('username/dataset-name');
 -- Returns JSON with size, description, update date, etc.
 ```
 
@@ -46,11 +46,11 @@ select gaggle_get_dataset_metadata('username/dataset-name');
 
 ```sql
 -- List files in a dataset
-select gaggle_get_dataset_files('username/dataset-name');
+select gaggle_list_files('username/dataset-name');
 -- Returns JSON array of files in the dataset
 
 -- Download a dataset (cached locally)
-select gaggle_download_dataset('username/dataset-name');
+select gaggle_download('username/dataset-name');
 -- Returns local directory path
 
 -- Read a CSV file from a Kaggle dataset
@@ -66,11 +66,11 @@ LOAD
 'build/release/extension/gaggle/gaggle.duckdb_extension';
 
 -- Search for a dataset
-select gaggle_search_datasets('iris');
+select gaggle_search('iris', 1, 10);
 
 -- Download and read the dataset
 select *
-from read_csv((select gaggle_download_dataset('uciml/iris') || '/iris.csv'));
+from read_csv((select gaggle_download('uciml/iris') || '/iris.csv'));
 ```
 
 ---
@@ -127,7 +127,7 @@ You also need to have Rust (nightly version) and Cargo installed.
 
 ### Configuration
 
-See [GAGGLE_GUIDE.md](GAGGLE_GUIDE.md) for more information about how to configure various settings for Gaggle.
+See [CONFIGURATION.md](CONFIGURATION.md) for more information about how to configure various settings for Gaggle.
 
 ### Architecture
 
@@ -143,7 +143,7 @@ Gaggle is made up of two main components:
 
 2. **C++ DuckDB Bindings (`gaggle/bindings/`)**: A C++ layer that connects the Rust core and DuckDB. Its
    responsibilities include:
-    * Defining the custom SQL functions (like `gaggle_set_credentials` and `gaggle_search_datasets`).
+    * Defining the custom SQL functions (like `gaggle_set_credentials` and `gaggle_search`).
     * Translating data from DuckDB's internal vector-based format into the raw data pointers expected by the Rust FFI.
     * Calling the Rust functions and handling the returned results and errors.
     * Integrating with DuckDB's extension loading mechanism.

@@ -182,6 +182,27 @@ char *gaggle_download_dataset(const char *dataset_path);
  char *gaggle_get_cache_info(void);
 
 /**
+ * Parse JSON and expand objects/arrays similar to json_each
+ *
+ * # Arguments
+ *
+ * * `json_str` - A pointer to a null-terminated C string containing JSON data
+ *
+ * # Returns
+ *
+ * A pointer to a null-terminated C string containing newline-delimited JSON objects
+ * representing each key-value pair (for objects) or each element (for arrays).
+ * Each line is a JSON object with "key", "value", "type", and "path" fields.
+ * The caller must free this pointer using `gaggle_free()`.
+ *
+ * # Safety
+ *
+ * * The `json_str` pointer must not be null.
+ * * The memory pointed to by `json_str` must be a valid, null-terminated C string.
+ */
+ char *gaggle_json_each(const char *json_str);
+
+/**
  * Retrieves the last error message set in the current thread.
  *
  * After an FFI function returns an error code, this function can be called
