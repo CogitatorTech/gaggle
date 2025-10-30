@@ -73,8 +73,8 @@ SELECT json_extract_string(value, '$.name') as filename
 FROM json_each(gaggle_list_files('heptapod/titanic'));
 
 -- Read and analyze data
-SELECT Pclass, 
-       Sex, 
+SELECT Pclass,
+       Sex,
        COUNT(*) as passengers,
        AVG(Age) as avg_age,
        SUM(Survived) * 100.0 / COUNT(*) as survival_rate
@@ -222,4 +222,3 @@ SELECT gaggle_set_credentials('username', 'api-key');
 - Kaggle API: https://www.kaggle.com/docs/api
 
 Happy data exploring with Gaggle! 🎉
-

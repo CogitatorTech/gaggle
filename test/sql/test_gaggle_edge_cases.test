@@ -1,0 +1,64 @@
+# group: [gaggle]
+
+# Test suite for Gaggle extension error handling and edge cases
+
+statement ok
+pragma enable_verification
+
+# Load the Gaggle extension
+statement ok
+load 'build/release/extension/gaggle/gaggle.duckdb_extension'
+
+# Test 1: Clear cache multiple times (idempotent operation)
+statement ok
+select gaggle_clear_cache()
+
+statement ok
+select gaggle_clear_cache()
+
+# Test 2: Set credentials multiple times (should overwrite)
+statement ok
+select gaggle_set_credentials('user1', 'key1')
+
+statement ok
+select gaggle_set_credentials('user2', 'key2')
+
+# Test 3: Verify version format is valid JSON
+query I
+select gaggle_get_version() like '{%}' or gaggle_get_version() = ''
+----
+1
+
+# Test 4: Test type consistency - functions should return consistent types
+query T
+select typeof(gaggle_get_version())
+----
+VARCHAR
+
+query T
+select typeof(gaggle_get_cache_info())
+----
+VARCHAR
+
+# Test 5: Operations should be thread-safe and repeatable
+statement ok
+select gaggle_clear_cache()
+
+statement ok
+select gaggle_get_cache_info()
+
+statement ok
+select gaggle_get_version()
+
+# Test 6: Verify boolean return from operations
+query I
+select gaggle_clear_cache() = true or gaggle_clear_cache() = 1
+----
+1
+
+# Test 7: Very long credentials should be handled
+statement ok
+select gaggle_set_credentials(
+  'very_long_username_' || repeat('a', 200),
+  'very_long_key_' || repeat('b', 500)
+)

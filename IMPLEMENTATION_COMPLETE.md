@@ -152,10 +152,10 @@ SELECT * FROM read_csv_auto(
 );
 
 -- Query like a regular table
-SELECT location, MAX(total_cases) 
-FROM covid 
-GROUP BY location 
-ORDER BY MAX(total_cases) DESC 
+SELECT location, MAX(total_cases)
+FROM covid
+GROUP BY location
+ORDER BY MAX(total_cases) DESC
 LIMIT 10;
 ```
 
@@ -321,4 +321,3 @@ SELECT gaggle_search('machine learning', 1, 5);
 ---
 
 **Happy Data Exploring! 📊✨**
-

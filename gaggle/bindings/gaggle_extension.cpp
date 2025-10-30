@@ -321,4 +321,3 @@ DUCKDB_EXTENSION_API void gaggle_init(duckdb::DatabaseInstance &db) {
   duckdb::LoadInternal(loader);
 }
 }
-

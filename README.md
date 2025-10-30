@@ -152,7 +152,7 @@ make release
 #### Trying Gaggle
 
 ```sql
--- 0. Install and load Gaggle 
+-- 0. Install and load Gaggle
 -- Skip this step if you built from source and ran `./build/release/duckdb`
 install gaggle from community;
 load gaggle;

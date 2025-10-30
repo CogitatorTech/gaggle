@@ -192,10 +192,10 @@ SELECT * FROM read_csv_auto(
 );
 
 -- Query like a regular table
-SELECT location, MAX(total_cases) 
-FROM covid_data 
-GROUP BY location 
-ORDER BY MAX(total_cases) DESC 
+SELECT location, MAX(total_cases)
+FROM covid_data
+GROUP BY location
+ORDER BY MAX(total_cases) DESC
 LIMIT 10;
 ```
 
@@ -287,4 +287,3 @@ SELECT * FROM read_csv_auto(
 The Gaggle extension has been successfully redesigned from an ML inference tool to a Kaggle dataset integration extension. The core implementation is complete, with a clean API for downloading, searching, and accessing Kaggle datasets directly from SQL queries.
 
 The next phase involves building, testing, and refining the implementation based on real-world usage.
-

@@ -188,7 +188,7 @@ SELECT * FROM json_each(gaggle_search('covid-19', 1, 10));
 -- Download and query
 SELECT * FROM read_csv_auto(
     (SELECT gaggle_download('owid/covid-latest-data') || '/owid-covid-latest.csv')
-) 
+)
 WHERE location = 'United States'
 LIMIT 10;
 ```
@@ -203,7 +203,7 @@ SELECT gaggle_download('heptapod/titanic');
 SELECT * FROM json_each(gaggle_list_files('heptapod/titanic'));
 
 -- Query the data
-SELECT 
+SELECT
     Pclass,
     Sex,
     AVG(Age) as avg_age,
@@ -224,18 +224,18 @@ SELECT gaggle_download('dataset1/name');
 SELECT gaggle_download('dataset2/name');
 
 -- Create views for easier access
-CREATE VIEW data1 AS 
+CREATE VIEW data1 AS
 SELECT * FROM read_csv_auto(
     (SELECT gaggle_download('dataset1/name') || '/data.csv')
 );
 
-CREATE VIEW data2 AS 
+CREATE VIEW data2 AS
 SELECT * FROM read_csv_auto(
     (SELECT gaggle_download('dataset2/name') || '/data.csv')
 );
 
 -- Perform joins
-SELECT * 
+SELECT *
 FROM data1 d1
 JOIN data2 d2 ON d1.id = d2.id;
 ```
@@ -253,14 +253,14 @@ JOIN data2 d2 ON d1.id = d2.id;
 - Dataset requires acceptance of competition rules
 - Rate limit exceeded
 
-**Solution:** 
+**Solution:**
 - Verify your credentials
 - Accept dataset terms on Kaggle website
 - Wait a few minutes before retrying
 
 ### Error: "Dataset not found"
 
-**Solution:** 
+**Solution:**
 - Verify the dataset path format: `owner/dataset-name`
 - Check if the dataset exists on Kaggle
 - Ensure you have access rights to the dataset
@@ -299,4 +299,3 @@ See the [API documentation](API.md) for detailed function signatures and return 
 
 - GitHub Issues: https://github.com/CogitatorTech/gaggle/issues
 - Documentation: https://github.com/CogitatorTech/gaggle/tree/main/docs
-

@@ -39,7 +39,7 @@ All core files have been successfully renamed and updated from "infera" to "gagg
 - **gaggle/src/config.rs**: Cache directory name changed from `infera_cache` to `gaggle_cache`
 
 ### C++ Bindings
-- **gaggle/bindings/gaggle_extension.cpp**: 
+- **gaggle/bindings/gaggle_extension.cpp**:
   - Include path updated
   - Class name `InferaExtension` → `GaggleExtension`
   - Helper function `GetInferaError()` → `GetGaggleError()`
@@ -92,4 +92,3 @@ The following files still contain "infera" references and may need updating depe
 - The Rust FFI layer now exports `gaggle_*` functions, which match the C++ calls
 - The extension loads as "gaggle" in DuckDB
 - Cache directory default name changed to `gaggle_cache`
-

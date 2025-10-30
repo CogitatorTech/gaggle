@@ -99,3 +99,158 @@ pub extern "C" fn gaggle_last_error() -> *const c_char {
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CStr;
+
+    #[test]
+    fn test_dataset_not_found_error() {
+        let err = GaggleError::DatasetNotFound("test/dataset".to_string());
+        assert_eq!(err.to_string(), "Dataset not found: test/dataset");
+    }
+
+    #[test]
+    fn test_utf8_error() {
+        let err = GaggleError::Utf8Error;
+        assert_eq!(err.to_string(), "Invalid UTF-8 string");
+    }
+
+    #[test]
+    fn test_null_pointer_error() {
+        let err = GaggleError::NullPointer;
+        assert_eq!(err.to_string(), "Null pointer passed");
+    }
+
+    #[test]
+    fn test_io_error() {
+        let err = GaggleError::IoError("file not found".to_string());
+        assert_eq!(err.to_string(), "IO error: file not found");
+    }
+
+    #[test]
+    fn test_json_error() {
+        let err = GaggleError::JsonError("invalid json".to_string());
+        assert_eq!(err.to_string(), "JSON serialization error: invalid json");
+    }
+
+    #[test]
+    fn test_http_request_error() {
+        let err = GaggleError::HttpRequestError("connection timeout".to_string());
+        assert_eq!(err.to_string(), "HTTP request failed: connection timeout");
+    }
+
+    #[test]
+    fn test_credentials_error() {
+        let err = GaggleError::CredentialsError("invalid credentials".to_string());
+        assert_eq!(
+            err.to_string(),
+            "Invalid Kaggle credentials: invalid credentials"
+        );
+    }
+
+    #[test]
+    fn test_invalid_dataset_path_error() {
+        let err = GaggleError::InvalidDatasetPath("bad/path/format".to_string());
+        assert_eq!(err.to_string(), "Invalid dataset path: bad/path/format");
+    }
+
+    #[test]
+    fn test_zip_error() {
+        let err = GaggleError::ZipError("corrupted zip file".to_string());
+        assert_eq!(err.to_string(), "ZIP extraction failed: corrupted zip file");
+    }
+
+    #[test]
+    fn test_csv_error() {
+        let err = GaggleError::CsvError("invalid csv format".to_string());
+        assert_eq!(err.to_string(), "CSV parsing error: invalid csv format");
+    }
+
+    #[test]
+    fn test_from_utf8_error() {
+        let invalid_utf8 = vec![0xff, 0xfe];
+        let utf8_result = std::str::from_utf8(&invalid_utf8);
+        assert!(utf8_result.is_err());
+
+        let err: GaggleError = utf8_result.unwrap_err().into();
+        assert_eq!(err.to_string(), "Invalid UTF-8 string");
+    }
+
+    #[test]
+    fn test_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err: GaggleError = io_err.into();
+        assert!(err.to_string().contains("IO error"));
+    }
+
+    #[test]
+    fn test_from_json_error() {
+        let json_result: Result<serde_json::Value, _> = serde_json::from_str("{invalid}");
+        assert!(json_result.is_err());
+
+        let err: GaggleError = json_result.unwrap_err().into();
+        assert!(err.to_string().contains("JSON serialization error"));
+    }
+
+    #[test]
+    fn test_set_last_error() {
+        let err = GaggleError::DatasetNotFound("test".to_string());
+        set_last_error(&err);
+
+        let error_ptr = gaggle_last_error();
+        assert!(!error_ptr.is_null());
+
+        unsafe {
+            let error_cstr = CStr::from_ptr(error_ptr);
+            let error_msg = error_cstr.to_str().unwrap();
+            assert!(error_msg.contains("Dataset not found"));
+        }
+    }
+
+    #[test]
+    fn test_last_error_null_initially() {
+        // Clear previous errors by setting and retrieving
+        let err = GaggleError::IoError("test".to_string());
+        set_last_error(&err);
+        gaggle_last_error();
+
+        // New thread should have no error initially
+        let handle = std::thread::spawn(|| gaggle_last_error().is_null());
+        assert!(handle.join().unwrap());
+    }
+
+    #[test]
+    fn test_error_display_formats() {
+        let errors = vec![
+            GaggleError::DatasetNotFound("owner/dataset".to_string()),
+            GaggleError::Utf8Error,
+            GaggleError::NullPointer,
+            GaggleError::IoError("read error".to_string()),
+        ];
+
+        for err in errors {
+            let msg = err.to_string();
+            assert!(!msg.is_empty());
+            assert!(msg.len() > 0);
+        }
+    }
+
+    #[test]
+    fn test_credentials_error_empty_message() {
+        let err = GaggleError::CredentialsError(String::new());
+        assert_eq!(err.to_string(), "Invalid Kaggle credentials: ");
+    }
+
+    #[test]
+    fn test_invalid_dataset_path_with_special_chars() {
+        let err = GaggleError::InvalidDatasetPath("user@host/dataset#123".to_string());
+        assert!(err.to_string().contains("user@host/dataset#123"));
+    }
+
+    #[test]
+    fn test_http_error_with_status_code() {
+        let err = GaggleError::HttpRequestError("HTTP 404: Not Found".to_string());
+        assert!(err.to_string().contains("404"));
+    }
+}

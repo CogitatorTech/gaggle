@@ -169,7 +169,7 @@ SELECT * FROM json_each(gaggle_search('covid-19', 1, 20));
 **Usage Pattern:**
 ```sql
 -- Find COVID datasets and show titles
-SELECT 
+SELECT
     json_extract_string(value, '$.ref') as dataset_path,
     json_extract_string(value, '$.title') as title,
     json_extract_string(value, '$.size') as size
@@ -296,7 +296,7 @@ SELECT * FROM read_csv_auto(
 
 ```sql
 -- Search for datasets
-SELECT 
+SELECT
     json_extract_string(value, '$.ref') as dataset,
     json_extract_string(value, '$.title') as title,
     CAST(json_extract_string(value, '$.downloadCount') AS INTEGER) as downloads
@@ -407,4 +407,3 @@ Kaggle API has rate limits:
 - Gaggle User Guide: [GAGGLE_GUIDE.md](GAGGLE_GUIDE.md)
 - Implementation Details: [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
 - GitHub Repository: https://github.com/CogitatorTech/gaggle
-

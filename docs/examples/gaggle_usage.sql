@@ -33,4 +33,3 @@ SELECT gaggle_clear_cache();
 
 # Get cache information
 SELECT * FROM json_each(gaggle_get_cache_info());
-

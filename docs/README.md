@@ -11,7 +11,7 @@ The table below includes the information about all SQL functions exposed by Gagg
 | 5  | `gaggle_get_dataset_metadata(dataset_path VARCHAR)`          | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info.                                                                       |
 
 > [!NOTE]
-> Kaggle credentials can be provided via environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`), 
+> Kaggle credentials can be provided via environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`),
 > a `~/.kaggle/kaggle.json` file, or using the `gaggle_set_credentials()` function.
 
 ---

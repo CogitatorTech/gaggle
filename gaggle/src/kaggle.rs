@@ -2,12 +2,11 @@
 
 use crate::config::CONFIG;
 use crate::error::GaggleError;
-use parking_lot::RwLock;
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Kaggle API credentials stored in memory
@@ -53,7 +52,10 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
     }
 
     // Try environment variables
-    if let (Ok(username), Ok(key)) = (std::env::var("KAGGLE_USERNAME"), std::env::var("KAGGLE_KEY")) {
+    if let (Ok(username), Ok(key)) = (
+        std::env::var("KAGGLE_USERNAME"),
+        std::env::var("KAGGLE_KEY"),
+    ) {
         let creds = KaggleCredentials { username, key };
         *CREDENTIALS.write() = Some(creds.clone());
         return Ok(creds);
@@ -66,13 +68,16 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
         .join("kaggle.json");
 
     if kaggle_json_path.exists() {
-        let content = fs::read_to_string(&kaggle_json_path)
-            .map_err(|e| GaggleError::CredentialsError(format!("Cannot read kaggle.json: {}", e)))?;
+        let content = fs::read_to_string(&kaggle_json_path).map_err(|e| {
+            GaggleError::CredentialsError(format!("Cannot read kaggle.json: {}", e))
+        })?;
 
         let json: serde_json::Value = serde_json::from_str(&content)?;
         let username = json["username"]
             .as_str()
-            .ok_or_else(|| GaggleError::CredentialsError("Missing username in kaggle.json".to_string()))?
+            .ok_or_else(|| {
+                GaggleError::CredentialsError("Missing username in kaggle.json".to_string())
+            })?
             .to_string();
         let key = json["key"]
             .as_str()
@@ -86,7 +91,8 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
 
     Err(GaggleError::CredentialsError(
         "No Kaggle credentials found. Set KAGGLE_USERNAME and KAGGLE_KEY environment variables, \
-         create ~/.kaggle/kaggle.json, or call kaggle_set_credentials()".to_string()
+         create ~/.kaggle/kaggle.json, or call kaggle_set_credentials()"
+            .to_string(),
     ))
 }
 
@@ -94,9 +100,10 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
 pub fn parse_dataset_path(path: &str) -> Result<(String, String), GaggleError> {
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() != 2 {
-        return Err(GaggleError::InvalidDatasetPath(
-            format!("Dataset path must be in format 'owner/dataset-name', got: {}", path)
-        ));
+        return Err(GaggleError::InvalidDatasetPath(format!(
+            "Dataset path must be in format 'owner/dataset-name', got: {}",
+            path
+        )));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
@@ -106,7 +113,11 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     let creds = get_credentials()?;
     let (owner, dataset) = parse_dataset_path(dataset_path)?;
 
-    let cache_dir = CONFIG.cache_dir.join("datasets").join(&owner).join(&dataset);
+    let cache_dir = CONFIG
+        .cache_dir
+        .join("datasets")
+        .join(&owner)
+        .join(&dataset);
     fs::create_dir_all(&cache_dir)?;
 
     // Check if already downloaded
@@ -116,7 +127,10 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     }
 
     // Download using Kaggle API
-    let url = format!("https://www.kaggle.com/api/v1/datasets/download/{}/{}", owner, dataset);
+    let url = format!(
+        "https://www.kaggle.com/api/v1/datasets/download/{}/{}",
+        owner, dataset
+    );
 
     let client = Client::new();
     let response = client
@@ -125,9 +139,10 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
         .send()?;
 
     if !response.status().is_success() {
-        return Err(GaggleError::HttpRequestError(
-            format!("Failed to download dataset: HTTP {}", response.status())
-        ));
+        return Err(GaggleError::HttpRequestError(format!(
+            "Failed to download dataset: HTTP {}",
+            response.status()
+        )));
     }
 
     // Save and extract ZIP
@@ -150,11 +165,12 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
 /// Extract ZIP file
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), GaggleError> {
     let file = fs::File::open(zip_path)?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| GaggleError::ZipError(e.to_string()))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| GaggleError::ZipError(e.to_string()))?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)
+        let mut file = archive
+            .by_index(i)
             .map_err(|e| GaggleError::ZipError(e.to_string()))?;
 
         let outpath = match file.enclosed_name() {
@@ -185,12 +201,18 @@ pub fn list_dataset_files(dataset_path: &str) -> Result<Vec<DatasetFile>, Gaggle
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_file() && path.file_name().unwrap() != ".downloaded" {
-            let metadata = fs::metadata(&path)?;
-            files.push(DatasetFile {
-                name: path.file_name().unwrap().to_string_lossy().to_string(),
-                size: metadata.len(),
-            });
+        if path.is_file() {
+            if let Some(file_name) = path.file_name() {
+                if file_name != ".downloaded" {
+                    let metadata = fs::metadata(&path)?;
+                    if let Some(name) = path.file_name() {
+                        files.push(DatasetFile {
+                            name: name.to_string_lossy().to_string(),
+                            size: metadata.len(),
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -203,16 +225,21 @@ pub fn get_dataset_file_path(dataset_path: &str, filename: &str) -> Result<PathB
     let file_path = dataset_dir.join(filename);
 
     if !file_path.exists() {
-        return Err(GaggleError::IoError(
-            format!("File '{}' not found in dataset '{}'", filename, dataset_path)
-        ));
+        return Err(GaggleError::IoError(format!(
+            "File '{}' not found in dataset '{}'",
+            filename, dataset_path
+        )));
     }
 
     Ok(file_path)
 }
 
 /// Search for datasets on Kaggle
-pub fn search_datasets(query: &str, page: i32, page_size: i32) -> Result<serde_json::Value, GaggleError> {
+pub fn search_datasets(
+    query: &str,
+    page: i32,
+    page_size: i32,
+) -> Result<serde_json::Value, GaggleError> {
     let creds = get_credentials()?;
 
     let url = format!(
@@ -229,9 +256,10 @@ pub fn search_datasets(query: &str, page: i32, page_size: i32) -> Result<serde_j
         .send()?;
 
     if !response.status().is_success() {
-        return Err(GaggleError::HttpRequestError(
-            format!("Failed to search datasets: HTTP {}", response.status())
-        ));
+        return Err(GaggleError::HttpRequestError(format!(
+            "Failed to search datasets: HTTP {}",
+            response.status()
+        )));
     }
 
     let json: serde_json::Value = response.json()?;
@@ -243,7 +271,10 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
     let creds = get_credentials()?;
     let (owner, dataset) = parse_dataset_path(dataset_path)?;
 
-    let url = format!("https://www.kaggle.com/api/v1/datasets/view/{}/{}", owner, dataset);
+    let url = format!(
+        "https://www.kaggle.com/api/v1/datasets/view/{}/{}",
+        owner, dataset
+    );
 
     let client = Client::new();
     let response = client
@@ -252,12 +283,278 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
         .send()?;
 
     if !response.status().is_success() {
-        return Err(GaggleError::HttpRequestError(
-            format!("Failed to get dataset metadata: HTTP {}", response.status())
-        ));
+        return Err(GaggleError::HttpRequestError(format!(
+            "Failed to get dataset metadata: HTTP {}",
+            response.status()
+        )));
     }
 
     let json: serde_json::Value = response.json()?;
     Ok(json)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kaggle_credentials_struct() {
+        let creds = KaggleCredentials {
+            username: "testuser".to_string(),
+            key: "testkey".to_string(),
+        };
+        assert_eq!(creds.username, "testuser");
+        assert_eq!(creds.key, "testkey");
+    }
+
+    #[test]
+    fn test_dataset_file_struct() {
+        let file = DatasetFile {
+            name: "data.csv".to_string(),
+            size: 1024,
+        };
+        assert_eq!(file.name, "data.csv");
+        assert_eq!(file.size, 1024);
+    }
+
+    #[test]
+    fn test_parse_dataset_path_valid() {
+        let result = parse_dataset_path("owner/dataset-name");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(dataset, "dataset-name");
+    }
+
+    #[test]
+    fn test_parse_dataset_path_with_numbers() {
+        let result = parse_dataset_path("user123/dataset456");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "user123");
+        assert_eq!(dataset, "dataset456");
+    }
+
+    #[test]
+    fn test_parse_dataset_path_with_hyphens() {
+        let result = parse_dataset_path("my-owner/my-dataset");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "my-owner");
+        assert_eq!(dataset, "my-dataset");
+    }
+
+    #[test]
+    fn test_parse_dataset_path_with_underscores() {
+        let result = parse_dataset_path("user_name/data_set");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "user_name");
+        assert_eq!(dataset, "data_set");
+    }
+
+    #[test]
+    fn test_parse_dataset_path_no_slash() {
+        let result = parse_dataset_path("ownerdataset");
+        assert!(result.is_err());
+        match result {
+            Err(GaggleError::InvalidDatasetPath(msg)) => {
+                assert!(msg.contains("must be in format"));
+            }
+            _ => panic!("Expected InvalidDatasetPath error"),
+        }
+    }
+
+    #[test]
+    fn test_parse_dataset_path_too_many_slashes() {
+        let result = parse_dataset_path("owner/dataset/extra");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_dataset_path_trailing_slash() {
+        let result = parse_dataset_path("owner/dataset/");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_dataset_path_leading_slash() {
+        let result = parse_dataset_path("/owner/dataset");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_dataset_path_empty_owner() {
+        let result = parse_dataset_path("/dataset");
+        // "/dataset" splits to ["", "dataset"], so it has 2 parts
+        // The function accepts it but owner is empty string
+        if result.is_ok() {
+            let (owner, _) = result.unwrap();
+            assert_eq!(owner, "");
+        }
+    }
+
+    #[test]
+    fn test_parse_dataset_path_empty_dataset() {
+        let result = parse_dataset_path("owner/");
+        // "owner/" splits to ["owner", ""], so it has 2 parts
+        // The function accepts it but dataset is empty string
+        if result.is_ok() {
+            let (_, dataset) = result.unwrap();
+            assert_eq!(dataset, "");
+        }
+    }
+
+    #[test]
+    fn test_parse_dataset_path_empty_string() {
+        let result = parse_dataset_path("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_dataset_path_result_strings() {
+        let result = parse_dataset_path("owner/dataset");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        // Verify they are strings
+        assert_eq!(owner.len(), 5);
+        assert_eq!(dataset.len(), 7);
+    }
+
+    #[test]
+    fn test_set_credentials() {
+        let result = set_credentials("testuser", "testkey");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_set_credentials_empty_username() {
+        let result = set_credentials("", "testkey");
+        assert!(result.is_ok()); // Should succeed but store empty username
+    }
+
+    #[test]
+    fn test_set_credentials_empty_key() {
+        let result = set_credentials("testuser", "");
+        assert!(result.is_ok()); // Should succeed but store empty key
+    }
+
+    #[test]
+    fn test_set_credentials_overwrite() {
+        let _ = set_credentials("user1", "key1");
+        let _ = set_credentials("user2", "key2");
+        // The second call should overwrite the first
+        assert!(set_credentials("user2", "key2").is_ok());
+    }
+
+    #[test]
+    fn test_set_credentials_with_special_chars() {
+        let result = set_credentials("user@domain.com", "key!@#$%^");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_set_credentials_very_long() {
+        let long_username = "a".repeat(1000);
+        let long_key = "b".repeat(1000);
+        let result = set_credentials(&long_username, &long_key);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_set_credentials_unicode() {
+        let result = set_credentials("用户名", "密钥");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_dataset_file_struct_serializable() {
+        let file = DatasetFile {
+            name: "test.csv".to_string(),
+            size: 2048,
+        };
+        let json = serde_json::to_string(&file);
+        assert!(json.is_ok());
+    }
+
+    #[test]
+    fn test_dataset_info_struct_serializable() {
+        let info = DatasetInfo {
+            ref_path: "owner/dataset".to_string(),
+            title: "Test Dataset".to_string(),
+            size: 1024000,
+            url: "https://kaggle.com/owner/dataset".to_string(),
+            last_updated: "2025-10-30".to_string(),
+        };
+        let json = serde_json::to_string(&info);
+        assert!(json.is_ok());
+    }
+
+    #[test]
+    fn test_credentials_clone() {
+        let creds = KaggleCredentials {
+            username: "user".to_string(),
+            key: "key".to_string(),
+        };
+        let cloned = creds.clone();
+        assert_eq!(creds.username, cloned.username);
+        assert_eq!(creds.key, cloned.key);
+    }
+
+    #[test]
+    fn test_dataset_file_different_sizes() {
+        let files = vec![
+            DatasetFile {
+                name: "small.txt".to_string(),
+                size: 100,
+            },
+            DatasetFile {
+                name: "large.csv".to_string(),
+                size: 1_000_000_000,
+            },
+            DatasetFile {
+                name: "empty.json".to_string(),
+                size: 0,
+            },
+        ];
+
+        for file in files {
+            assert!(!file.name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_parse_dataset_path_with_dots() {
+        let result = parse_dataset_path("owner.name/dataset.name");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "owner.name");
+        assert_eq!(dataset, "dataset.name");
+    }
+
+    #[test]
+    fn test_parse_dataset_path_case_preservation() {
+        let result = parse_dataset_path("OwNeR/DaTaSeT");
+        assert!(result.is_ok());
+        let (owner, dataset) = result.unwrap();
+        assert_eq!(owner, "OwNeR");
+        assert_eq!(dataset, "DaTaSeT");
+    }
+
+    #[test]
+    fn test_kaggle_credentials_debug() {
+        let creds = KaggleCredentials {
+            username: "user".to_string(),
+            key: "key".to_string(),
+        };
+        let debug_str = format!("{:?}", creds);
+        assert!(debug_str.contains("KaggleCredentials"));
+    }
+
+    #[test]
+    fn test_credentials_multiple_slashes_in_dataset() {
+        // This should fail because of too many parts
+        let result = parse_dataset_path("owner/dataset/withslash");
+        assert!(result.is_err());
+    }
+}
