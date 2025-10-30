@@ -9,26 +9,22 @@ configuration, and usage.
 
 ### Prerequisites
 
-- DuckDB (latest version recommended)
+- DuckDB (matching the version bundled in `external/duckdb` if building from source)
 - Kaggle API credentials
+- Rust toolchain (for building the Rust core)
 
 ### Building from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/CogitatorTech/gaggle.git
+# Clone the repository (including submodules)
+git clone --recursive https://github.com/CogitatorTech/gaggle.git
 cd gaggle
 
-# Build the Rust library
-cd gaggle
-cargo build --release --features duckdb_extension
-cd ..
-
-# Build the DuckDB extension
+# Build (DuckDB + extension + Rust core)
 make release
 
-# Install (optional)
-make install
+# Start the local DuckDB shell with the extension available
+./build/release/duckdb
 ```
 
 ## Configuration
@@ -50,8 +46,8 @@ Create `~/.kaggle/kaggle.json`:
 
 ```json
 {
-  "username": "your-username",
-  "key": "your-api-key"
+    "username": "your-username",
+    "key": "your-api-key"
 }
 ```
 
@@ -113,69 +109,56 @@ SELECT gaggle_set_credentials('username', 'api-key');
 
 ```sql
 -- Search for COVID-19 datasets
-SELECT * FROM json_each(
-    gaggle_search('covid-19', 1, 20)
-);
-
--- Parameters: (query, page, page_size)
+SELECT gaggle_search('covid-19', 1, 20) AS results_json;
 ```
 
 #### 3. Download Dataset
 
 ```sql
 -- Download and get local cache path
-SELECT gaggle_download('owid/covid-latest-data');
--- Returns: /path/to/cache/datasets/owid/covid-latest-data
+SELECT gaggle_download('owid/covid-latest-data') AS local_dir;
 ```
 
-#### 4. List Files in Dataset
+#### 4. List Files in Dataset (Table)
 
 ```sql
-SELECT * FROM json_each(
-    gaggle_list_files('owid/covid-latest-data')
-);
--- Returns: JSON array of files with name and size
+-- Returns rows: name, size (MB), path
+SELECT * FROM gaggle_ls('owid/covid-latest-data') LIMIT 5;
 ```
 
 #### 5. Get Dataset Metadata
 
 ```sql
-SELECT * FROM json_each(
-    gaggle_info('owid/covid-latest-data')
-);
--- Returns: JSON with title, description, size, etc.
+SELECT gaggle_info('owid/covid-latest-data') AS metadata_json;
 ```
 
 #### 6. Read Dataset Files
 
 ```sql
--- Get the local path to a specific file
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('owid/covid-latest-data') || '/owid-covid-latest.csv')
-) LIMIT 100;
+-- Preferred: Parquet via prepared statement
+PREPARE rp AS SELECT * FROM read_parquet(?) LIMIT 100;
+EXECUTE rp(gaggle_file_paths('owid/covid-latest-data', 'owid-covid-latest.parquet'));
 
--- Or use Parquet files
-SELECT * FROM parquet_scan(
-    (SELECT gaggle_download('username/dataset') || '/data.parquet')
-);
+-- Replacement scan via kaggle: URL
+SELECT COUNT(*)
+FROM 'kaggle:owid/covid-latest-data/*.parquet';
 ```
 
 #### 7. Cache Management
 
 ```sql
--- Get cache information
-SELECT * FROM json_each(gaggle_get_cache_info());
+-- Cache information (JSON with path, size [MB], type)
+SELECT gaggle_cache_info();
 
--- Clear cache
-SELECT gaggle_clear_cache();
--- Returns: true on success
+-- Purge cache (clears local dataset cache)
+SELECT gaggle_purge_cache();
 ```
 
 #### 8. Get Version
 
 ```sql
-SELECT gaggle_get_version();
--- Returns: JSON with version info
+SELECT gaggle_version();
+-- Returns: plain version string (e.g., '0.1.0')
 ```
 
 ## Examples
@@ -186,14 +169,11 @@ SELECT gaggle_get_version();
 LOAD gaggle;
 
 -- Search for COVID datasets
-SELECT * FROM json_each(gaggle_search('covid-19', 1, 10));
+SELECT gaggle_search('covid-19', 1, 10) AS results_json;
 
--- Download and query
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('owid/covid-latest-data') || '/owid-covid-latest.csv')
-)
-WHERE location = 'United States'
-LIMIT 10;
+-- Download and query (Parquet if available)
+PREPARE rp AS SELECT * FROM read_parquet(?) LIMIT 10;
+EXECUTE rp(gaggle_file_paths('owid/covid-latest-data', 'owid-covid-latest.parquet'));
 ```
 
 ### Example 2: Analyze Titanic Dataset
@@ -202,19 +182,18 @@ LIMIT 10;
 -- Download Titanic dataset
 SELECT gaggle_download('heptapod/titanic');
 
--- List available files
-SELECT * FROM json_each(gaggle_list_files('heptapod/titanic'));
+-- List available files (table)
+SELECT * FROM gaggle_ls('heptapod/titanic');
 
--- Query the data
-SELECT
-    Pclass,
-    Sex,
-    AVG(Age) as avg_age,
-    AVG(Fare) as avg_fare,
-    SUM(Survived) * 100.0 / COUNT(*) as survival_rate
+-- Query the data (CSV)
+SELECT Pclass,
+       Sex,
+       AVG(Age)                         as avg_age,
+       AVG(Fare)                        as avg_fare,
+       SUM(Survived) * 100.0 / COUNT(*) as survival_rate
 FROM read_csv_auto(
-    (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
-)
+        (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
+     )
 GROUP BY Pclass, Sex
 ORDER BY Pclass, Sex;
 ```
@@ -228,19 +207,21 @@ SELECT gaggle_download('dataset2/name');
 
 -- Create views for easier access
 CREATE VIEW data1 AS
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('dataset1/name') || '/data.csv')
-);
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('dataset1/name') || '/data.csv')
+     );
 
 CREATE VIEW data2 AS
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('dataset2/name') || '/data.csv')
-);
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('dataset2/name') || '/data.csv')
+     );
 
 -- Perform joins
 SELECT *
 FROM data1 d1
-JOIN data2 d2 ON d1.id = d2.id;
+         JOIN data2 d2 ON d1.id = d2.id;
 ```
 
 ## Troubleshooting
@@ -276,8 +257,8 @@ JOIN data2 d2 ON d1.id = d2.id;
 If you experience cache corruption:
 
 ```sql
--- Clear the entire cache
-SELECT gaggle_clear_cache();
+-- Purge the entire cache
+SELECT gaggle_purge_cache();
 
 -- Re-download the dataset
 SELECT gaggle_download('owner/dataset-name');
@@ -286,9 +267,9 @@ SELECT gaggle_download('owner/dataset-name');
 ## Performance Tips
 
 1. **Use caching**: Downloaded datasets are cached locally for fast subsequent access
-2. **Filter early**: Use WHERE clauses to limit data read from CSV files
-3. **Create views**: For frequently accessed datasets, create views
-4. **Parquet over CSV**: When available, use Parquet files for better performance
+2. **Filter early**: Use WHERE clauses to limit data read
+3. **Prefer Parquet**: Use Parquet files for better performance when available
+4. **Prepared statements**: Use PREPARE/EXECUTE to pass dynamic file paths to table functions
 
 ## Security Notes
 

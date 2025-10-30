@@ -146,7 +146,7 @@ char *gaggle_download_dataset(const char *dataset_path);
  *
  * # Returns
  *
- * A pointer to a null-terminated C string containing JSON version info.
+ * A pointer to a null-terminated C string containing the version string (e.g., "0.1.0").
  * The caller must free this pointer using `gaggle_free()`.
  */
  char *gaggle_get_version(void);
@@ -215,6 +215,14 @@ char *gaggle_download_dataset(const char *dataset_path);
  * The caller **must not** free this pointer, as it is managed by a thread-local static variable.
  */
  const char *gaggle_last_error(void);
+
+/**
+ * Clears the last error for the current thread.
+ *
+ * This is useful for ensuring that old error messages don't persist
+ * and get confused with new errors.
+ */
+ void gaggle_clear_last_error(void);
 
 #ifdef __cplusplus
 }  // extern "C"

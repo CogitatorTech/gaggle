@@ -293,7 +293,8 @@ FROM json_each(gaggle_get_cache_info());
 
 ### `gaggle_json_each`
 
-Parse and expand JSON objects and arrays into newline-delimited JSON (NDJSON) rows. Each line is a JSON object with keys `key`, `value`, `type`, and `path`. You can wrap the NDJSON into a JSON array to use DuckDB's JSON table functions.
+Parse and expand JSON objects and arrays into newline-delimited JSON (NDJSON) rows. Each line is a JSON object with keys
+`key`, `value`, `type`, and `path`. You can wrap the NDJSON into a JSON array to use DuckDB's JSON table functions.
 
 **Signature:**
 
@@ -315,10 +316,8 @@ gaggle_json_each
 
 ```sql
 -- Expand search results and feed into DuckDB's json_each by wrapping as an array
-WITH ndjson AS (
-  SELECT gaggle_json_each(gaggle_search('covid', 1, 5)) AS s
-)
-SELECT json_extract(value, '$.ref') AS dataset_path,
+WITH ndjson AS (SELECT gaggle_json_each(gaggle_search('covid', 1, 5)) AS s)
+SELECT json_extract(value, '$.ref')   AS dataset_path,
        json_extract(value, '$.title') AS title
 FROM json_each('[' || replace((SELECT s FROM ndjson), '\n', ',') || ']')
 WHERE json_type(value) = 'object';
@@ -326,7 +325,8 @@ WHERE json_type(value) = 'object';
 
 **Notes:**
 
-- Output is NDJSON, not a table by itself. Wrap in brackets and replace newlines with commas to form a JSON array when using DuckDB's `json_*` functions.
+- Output is NDJSON, not a table by itself. Wrap in brackets and replace newlines with commas to form a JSON array when
+  using DuckDB's `json_*` functions.
 - Works with output from `gaggle_search()`, `gaggle_list_files()`, `gaggle_info()`, and `gaggle_get_cache_info()`
 
 ---

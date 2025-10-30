@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-import os
-import sys
 import io
 import json
-import time
+import os
 import socket
-import threading
-import tempfile
 import subprocess
+import sys
+import tempfile
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
@@ -83,7 +83,8 @@ def run_duckdb(sql: str, env: dict) -> subprocess.CompletedProcess:
     duck = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'build', 'release', 'duckdb'))
     if not os.path.exists(duck):
         raise RuntimeError(f"DuckDB binary not found at {duck}; build it with 'make release'")
-    return subprocess.run([duck, '-batch'], input=sql.encode('utf-8'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, check=False)
+    return subprocess.run([duck, '-batch'], input=sql.encode('utf-8'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          env=env, check=False)
 
 
 def main():
@@ -109,6 +110,7 @@ SELECT gaggle_set_credentials('user','key');
 SELECT gaggle_download('owner/dataset');
 SELECT COUNT(*) FROM read_csv_auto((SELECT gaggle_download('owner/dataset') || '/test.csv'));
 SELECT COUNT(*) FROM 'kaggle:owner/dataset/test.csv';
+SELECT COUNT(*) FROM 'kaggle:owner/dataset/*.csv';
 SELECT gaggle_search('x', 1, 1);
 """
         proc = run_duckdb(sql, env)
@@ -117,10 +119,26 @@ SELECT gaggle_search('x', 1, 1);
         if proc.returncode != 0:
             print('DuckDB failed:', err)
             sys.exit(1)
-        # Expect count '2' appears at least once
-        assert ',2\n' in out or '\n2\n' in out, f"Expected count 2 in output, got: {out}"
+        # Expect count '2' appears at least once (for explicit path and wildcard)
+        assert out.count('\n2\n') + out.count(',2\n') >= 1, f"Expected count 2 in output, got: {out}"
         # Expect empty array [] for search
         assert '[]' in out, f"Expected [] in output for search, got: {out}"
+
+        # Error case: missing file via replacement scan should error on query
+        sql_err = """
+                  SELECT COUNT(*)
+                  FROM 'kaggle:owner/dataset/missing.csv'; \
+                  """
+        proc_err = run_duckdb(sql_err, env)
+        assert proc_err.returncode != 0, "Expected failure for missing file replacement scan"
+
+        # Error case: invalid dataset path should error on download
+        sql_bad = """
+SELECT gaggle_download('owner_only');
+"""
+        proc_bad = run_duckdb(sql_bad, env)
+        assert proc_bad.returncode != 0, "Expected failure for invalid dataset path"
+
         print('Integration test passed')
         return 0
     finally:

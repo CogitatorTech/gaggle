@@ -1,6 +1,8 @@
 // Centralized configuration management for Gaggle
 
 use once_cell::sync::Lazy;
+#[cfg(test)]
+use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
 
@@ -19,6 +21,7 @@ pub struct GaggleConfig {
     /// HTTP timeout in seconds
     #[allow(dead_code)]
     pub http_timeout_secs: u64,
+    // Future: other options
 }
 
 impl GaggleConfig {
@@ -35,6 +38,7 @@ impl GaggleConfig {
     fn get_cache_dir() -> PathBuf {
         env::var("GAGGLE_CACHE_DIR")
             .ok()
+            .filter(|s| !s.is_empty()) // Treat empty string as not set
             .map(PathBuf::from)
             .unwrap_or_else(|| {
                 dirs::cache_dir()
@@ -73,7 +77,38 @@ impl Default for GaggleConfig {
 
 /// Runtime-resolved cache directory (checks env each call, falls back to CONFIG)
 pub fn cache_dir_runtime() -> PathBuf {
-    env::var("GAGGLE_CACHE_DIR").map(PathBuf::from).unwrap_or_else(|_| CONFIG.cache_dir.clone())
+    // 1) Test-only thread-local override (highest precedence in tests)
+    #[cfg(test)]
+    {
+        thread_local! {
+            static OVERRIDE_CACHE_DIR: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+        }
+        let mut tls: Option<PathBuf> = None;
+        OVERRIDE_CACHE_DIR.with(|c| {
+            tls = c.borrow().clone();
+        });
+        if let Some(p) = tls {
+            return p;
+        }
+    }
+    // 2) Environment variable
+    if let Ok(val) = env::var("GAGGLE_CACHE_DIR") {
+        if !val.is_empty() {
+            return PathBuf::from(val);
+        }
+    }
+    // 3) Fallback to static config
+    CONFIG.cache_dir.clone()
+}
+
+#[cfg(test)]
+pub fn set_test_cache_dir(p: Option<PathBuf>) {
+    thread_local! {
+        static OVERRIDE_CACHE_DIR: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    }
+    OVERRIDE_CACHE_DIR.with(|c| {
+        *c.borrow_mut() = p;
+    });
 }
 
 /// Runtime HTTP timeout seconds (checks env each call, falls back to CONFIG)
@@ -82,6 +117,30 @@ pub fn http_timeout_runtime_secs() -> u64 {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(CONFIG.http_timeout_secs)
+}
+
+/// Runtime HTTP retry attempts (default 0 if not set)
+pub fn http_retry_attempts() -> u32 {
+    env::var("GAGGLE_HTTP_RETRY_ATTEMPTS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+/// Runtime initial HTTP retry delay in milliseconds (default 1000 ms)
+pub fn http_retry_delay_ms() -> u64 {
+    env::var("GAGGLE_HTTP_RETRY_DELAY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000)
+}
+
+/// Runtime maximum HTTP retry backoff delay in milliseconds (default 30000 ms)
+pub fn http_retry_max_delay_ms() -> u64 {
+    env::var("GAGGLE_HTTP_RETRY_MAX_DELAY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30_000)
 }
 
 #[cfg(test)]
@@ -202,6 +261,46 @@ mod tests {
     }
 
     #[test]
+    fn test_http_retry_defaults() {
+        std::env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
+        std::env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
+        std::env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
+        assert_eq!(http_retry_attempts(), 0);
+        assert_eq!(http_retry_delay_ms(), 1000);
+        assert_eq!(http_retry_max_delay_ms(), 30_000);
+    }
+
+    #[test]
+    fn test_http_retry_env() {
+        std::env::set_var("GAGGLE_HTTP_RETRY_ATTEMPTS", "3");
+        std::env::set_var("GAGGLE_HTTP_RETRY_DELAY", "250");
+        assert_eq!(http_retry_attempts(), 3);
+        assert_eq!(http_retry_delay_ms(), 250);
+        std::env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
+        std::env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
+    }
+
+    #[test]
+    fn test_http_retry_max_delay_configurable() {
+        let prev = std::env::var("GAGGLE_HTTP_RETRY_MAX_DELAY").ok();
+        std::env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "5000");
+        let max_delay = http_retry_max_delay_ms();
+        assert_eq!(max_delay, 5000);
+        if let Some(v) = prev {
+            std::env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", v);
+        } else {
+            std::env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
+        }
+    }
+
+    #[test]
+    fn test_http_retry_max_delay_default() {
+        std::env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
+        let max_delay = http_retry_max_delay_ms();
+        assert_eq!(max_delay, 30_000);
+    }
+
+    #[test]
     fn test_cache_dir_path_format() {
         let config = GaggleConfig::default();
         let path_str = config.cache_dir.to_str().unwrap();
@@ -244,8 +343,8 @@ mod tests {
     fn test_empty_cache_dir_env() {
         std::env::set_var("GAGGLE_CACHE_DIR", "");
         let cache_dir = GaggleConfig::get_cache_dir();
-        // Empty string should be treated as valid
-        assert_eq!(cache_dir, PathBuf::from(""));
+        // Empty string in env var should be treated as "not set" and use default
+        assert!(cache_dir.to_str().unwrap().contains(DEFAULT_CACHE_DIR_NAME));
         std::env::remove_var("GAGGLE_CACHE_DIR");
     }
 

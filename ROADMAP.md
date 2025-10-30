@@ -36,12 +36,13 @@ It outlines features to be implemented and their current status.
 ### 3. Data Integration
 
 * **File Format Support**
-    * [x] CSV/TSV file reading integration.
+    * [x] CSV and TSV file reading.
     * [x] JSON file reading.
     * [x] Parquet file reading.
-    * [x] Excel and XLSX file reading.
+    * [ ] Excel and XLSX file reading.
 * **Direct Query Integration**
-    * [ ] Direct SQL queries on remote datasets without full download.
+    * [x] Replacement scan for `kaggle:` URLs.
+    * [ ] Direct SQL queries on remote datasets without full download (true streaming).
     * [ ] Streaming data from Kaggle without caching.
     * [ ] Virtual table support for lazy loading.
 
@@ -53,8 +54,7 @@ It outlines features to be implemented and their current status.
     * [ ] Concurrent dataset downloads.
 * **Network Optimization**
     * [x] Configurable HTTP timeouts.
-    * [ ] Connection pooling for Kaggle API requests.
-    * [ ] Retry logic with exponential backoff.
+    * [ ] Retry logic with backoff (configurable attempts/delay; planned).
 * **Caching Strategy**
     * [ ] Incremental cache updates.
     * [ ] Background cache synchronization.
@@ -67,7 +67,7 @@ It outlines features to be implemented and their current status.
     * [x] Clear error messages for `NULL` inputs.
     * [ ] Detailed error codes for programmatic error handling.
 * **Resilience**
-    * [ ] Automatic retry on network failures.
+    * [ ] Automatic retry on network failures (planned with backoff settings).
     * [ ] Graceful degradation when Kaggle API is unavailable.
     * [ ] Local-only mode for cached datasets.
 
@@ -75,14 +75,14 @@ It outlines features to be implemented and their current status.
 
 * **Documentation**
     * [x] API reference in README.md.
-    * [x] Usage examples (see  `docs/examples/`).
+    * [x] Usage examples (see `docs/examples/`).
     * [ ] Tutorial documentation.
     * [ ] FAQ section.
     * [ ] Troubleshooting guide.
 * **Testing**
-    * [x] Unit tests for all modules.
-    * [x] SQL integration tests.
-    * [ ] End-to-end integration tests.
+    * [x] Unit tests for core modules (Rust).
+    * [x] SQL integration tests (DuckDB shell).
+    * [ ] End-to-end integration tests with mocked HTTP.
     * [ ] Performance benchmarks.
 * **Distribution**
     * [ ] Pre-compiled extension binaries for Linux, macOS, and Windows.

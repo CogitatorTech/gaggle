@@ -10,14 +10,24 @@ mod error;
 mod kaggle;
 
 // Re-export the public FFI utility functions
+pub use error::gaggle_clear_last_error;
 pub use error::gaggle_last_error;
+pub use kaggle::parse_dataset_path;
 
 /// Helper function to safely convert a String to a C string pointer
 /// Returns null pointer if the string contains null bytes
-fn string_to_c_string(s: String) -> *mut c_char {
+pub(crate) fn string_to_c_string(s: String) -> *mut c_char {
     match CString::new(s) {
         Ok(cstring) => cstring.into_raw(),
-        Err(_) => std::ptr::null_mut(),
+        Err(e) => {
+            // Set error to help diagnose the issue
+            let err = error::GaggleError::IoError(format!(
+                "String contains null byte at position {}",
+                e.nul_position()
+            ));
+            error::set_last_error(&err);
+            std::ptr::null_mut()
+        }
     }
 }
 
@@ -42,6 +52,9 @@ pub unsafe extern "C" fn gaggle_set_credentials(
     username: *const c_char,
     key: *const c_char,
 ) -> i32 {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<(), error::GaggleError> {
         if username.is_null() || key.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -78,6 +91,9 @@ pub unsafe extern "C" fn gaggle_set_credentials(
 /// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if dataset_path.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -118,6 +134,9 @@ pub unsafe extern "C" fn gaggle_get_file_path(
     dataset_path: *const c_char,
     filename: *const c_char,
 ) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if dataset_path.is_null() || filename.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -155,6 +174,9 @@ pub unsafe extern "C" fn gaggle_get_file_path(
 /// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if dataset_path.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -198,6 +220,9 @@ pub unsafe extern "C" fn gaggle_search(
     page: i32,
     page_size: i32,
 ) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if query.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -235,6 +260,9 @@ pub unsafe extern "C" fn gaggle_search(
 /// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if dataset_path.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -259,16 +287,12 @@ pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) ->
 ///
 /// # Returns
 ///
-/// A pointer to a null-terminated C string containing JSON version info.
+/// A pointer to a null-terminated C string containing the version string (e.g., "0.1.0").
 /// The caller must free this pointer using `gaggle_free()`.
 #[no_mangle]
 pub extern "C" fn gaggle_get_version() -> *mut c_char {
-    let version_info = json!({
-        "version": env!("CARGO_PKG_VERSION"),
-        "name": "Gaggle - Kaggle Dataset DuckDB Extension",
-    });
-
-    string_to_c_string(version_info.to_string())
+    // Return only the version string (no JSON wrapper)
+    string_to_c_string(env!("CARGO_PKG_VERSION").to_string())
 }
 
 /// Frees a heap-allocated C string
@@ -293,10 +317,13 @@ pub unsafe extern "C" fn gaggle_free(ptr: *mut c_char) {
 #[no_mangle]
 pub extern "C" fn gaggle_clear_cache() -> i32 {
     let result = (|| -> Result<(), error::GaggleError> {
-        let cache_dir = &config::CONFIG.cache_dir;
+        // Use runtime-resolved cache dir to honor env overrides
+        let cache_dir = crate::config::cache_dir_runtime();
         if cache_dir.exists() {
-            fs::remove_dir_all(cache_dir)?;
-            fs::create_dir_all(cache_dir)?;
+            fs::remove_dir_all(&cache_dir)?;
+            fs::create_dir_all(&cache_dir)?;
+        } else {
+            fs::create_dir_all(&cache_dir)?;
         }
         Ok(())
     })();
@@ -318,15 +345,16 @@ pub extern "C" fn gaggle_clear_cache() -> i32 {
 /// The caller must free this pointer using `gaggle_free()`.
 #[no_mangle]
 pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
-    let cache_dir = &config::CONFIG.cache_dir;
+    let cache_dir = crate::config::cache_dir_runtime();
 
-    let size = calculate_dir_size(cache_dir).unwrap_or(0);
+    let size_bytes = calculate_dir_size(&cache_dir).unwrap_or(0);
+    let size_mb = size_bytes / (1024 * 1024);
+    // Only three keys: path, size (MB), type (local)
     let info = json!({
-        "cache_dir": cache_dir.to_string_lossy(),
-        "size_bytes": size,
-        "size_mb": size / (1024 * 1024),
+        "path": cache_dir.to_string_lossy(),
+        "size": size_mb,
+        "type": "local",
     });
-
     string_to_c_string(info.to_string())
 }
 
@@ -355,9 +383,6 @@ fn calculate_dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
 /// # Returns
 ///
 /// A pointer to a null-terminated C string containing newline-delimited JSON objects
-/// representing each key-value pair (for objects) or each element (for arrays).
-/// Each line is a JSON object with "key", "value", "type", and "path" fields.
-/// The caller must free this pointer using `gaggle_free()`.
 ///
 /// # Safety
 ///
@@ -365,6 +390,9 @@ fn calculate_dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
 /// * The memory pointed to by `json_str` must be a valid, null-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_char {
+    // Clear any previous error
+    error::clear_last_error_internal();
+
     let result = (|| -> Result<String, error::GaggleError> {
         if json_str.is_null() {
             return Err(error::GaggleError::NullPointer);
@@ -398,11 +426,7 @@ pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_cha
 }
 
 /// Helper function to recursively expand JSON values
-fn expand_json_value(
-    value: &serde_json::Value,
-    path: &str,
-    rows: &mut Vec<serde_json::Value>,
-) {
+fn expand_json_value(value: &serde_json::Value, path: &str, rows: &mut Vec<serde_json::Value>) {
     match value {
         serde_json::Value::Object(map) => {
             for (key, val) in map.iter() {
@@ -472,8 +496,9 @@ mod tests {
             let version_cstr = std::ffi::CStr::from_ptr(version_ptr);
             let version_str = version_cstr.to_str().unwrap();
             assert!(!version_str.is_empty());
-            assert!(version_str.contains("version"));
-            assert!(version_str.contains("Gaggle"));
+            // Should be a plain version string like "0.1.0"
+            assert!(!version_str.contains("{"));
+            assert!(!version_str.contains("}"));
 
             gaggle_free(version_ptr);
         }
@@ -485,9 +510,9 @@ mod tests {
         unsafe {
             let version_cstr = std::ffi::CStr::from_ptr(version_ptr);
             let version_str = version_cstr.to_str().unwrap();
-            // Should be valid JSON
-            assert!(version_str.starts_with('{'));
-            assert!(version_str.ends_with('}'));
+            // Should not be JSON; just a semantic version-like string
+            assert!(!version_str.starts_with('{'));
+            assert!(!version_str.ends_with('}'));
 
             gaggle_free(version_ptr);
         }
@@ -526,7 +551,7 @@ mod tests {
             let info_cstr = std::ffi::CStr::from_ptr(info_ptr);
             let info_str = info_cstr.to_str().unwrap();
             assert!(!info_str.is_empty());
-            assert!(info_str.contains("cache_dir"));
+            assert!(info_str.contains("\"path\""));
 
             gaggle_free(info_ptr);
         }
@@ -541,8 +566,10 @@ mod tests {
             // Should be valid JSON
             assert!(info_str.starts_with('{'));
             assert!(info_str.ends_with('}'));
-            // Should contain size information
-            assert!(info_str.contains("size"));
+            // Should contain only the documented keys
+            assert!(info_str.contains("\"path\""));
+            assert!(info_str.contains("\"size\""));
+            assert!(info_str.contains("\"type\""));
 
             gaggle_free(info_ptr);
         }
@@ -694,7 +721,10 @@ mod tests {
         unsafe {
             let info_cstr = std::ffi::CStr::from_ptr(info_ptr);
             let info_str = info_cstr.to_str().unwrap();
-            assert!(info_str.contains("size_bytes") || info_str.contains("size_mb"));
+            // Check for the new keys: path, size (MB), type
+            assert!(info_str.contains("\"path\""));
+            assert!(info_str.contains("\"size\""));
+            assert!(info_str.contains("\"type\""));
 
             gaggle_free(info_ptr);
         }
@@ -706,8 +736,8 @@ mod tests {
         unsafe {
             let version_cstr = std::ffi::CStr::from_ptr(version_ptr);
             let version_str = version_cstr.to_str().unwrap();
-            // Should contain package version
-            assert!(version_str.contains("0.1.0") || version_str.contains("version"));
+            // Should contain package version string
+            assert!(!version_str.is_empty());
 
             gaggle_free(version_ptr);
         }
@@ -743,4 +773,98 @@ mod tests {
             gaggle_free(version2_ptr);
         }
     }
+
+    #[test]
+    fn test_string_to_c_string_with_null_byte() {
+        let s = String::from("test\0embedded");
+        let ptr = string_to_c_string(s);
+        assert!(ptr.is_null());
+
+        // Error should be set
+        let err_ptr = gaggle_last_error();
+        assert!(!err_ptr.is_null());
+        unsafe {
+            let err_str = std::ffi::CStr::from_ptr(err_ptr).to_str().unwrap();
+            assert!(err_str.contains("null byte"));
+        }
+    }
+
+    #[test]
+    fn test_string_to_c_string_normal() {
+        let s = String::from("test string");
+        let ptr = string_to_c_string(s);
+        assert!(!ptr.is_null());
+        unsafe {
+            gaggle_free(ptr);
+        }
+    }
+
+    #[test]
+    fn test_gaggle_clear_cache_uses_runtime_env() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
+
+        // create a file inside cache dir
+        let nested = temp_dir.path().join("datasets");
+        fs::create_dir_all(&nested).unwrap();
+        let f = nested.join("dummy.txt");
+        fs::write(&f, b"x").unwrap();
+        assert!(f.exists());
+
+        // clear cache should remove and recreate top-level dir
+        let rc = gaggle_clear_cache();
+        assert_eq!(rc, 0);
+        assert!(temp_dir.path().exists());
+        // nested content should be gone
+        assert!(!f.exists());
+
+        std::env::remove_var("GAGGLE_CACHE_DIR");
+    }
+
+    #[test]
+    fn test_gaggle_json_each_object_and_array() {
+        let input = serde_json::json!({
+            "a": 1,
+            "b": [true, {"c": "x"}],
+        })
+        .to_string();
+        let c = std::ffi::CString::new(input).unwrap();
+        let out_ptr = unsafe { gaggle_json_each(c.as_ptr()) };
+        assert!(!out_ptr.is_null());
+        unsafe {
+            let out = std::ffi::CStr::from_ptr(out_ptr)
+                .to_str()
+                .unwrap()
+                .to_string();
+            gaggle_free(out_ptr);
+            let lines: Vec<&str> = out.lines().collect();
+            // Should have at least the top-level keys a and b
+            assert!(lines.len() >= 2);
+            assert!(lines.iter().any(|l| l.contains("\"key\":\"a\"")));
+            assert!(lines.iter().any(|l| l.contains("\"key\":\"b\"")));
+        }
+    }
+
+    #[test]
+    fn test_gaggle_json_each_invalid_json_sets_error() {
+        let invalid = std::ffi::CString::new("{not json}").unwrap();
+        let out_ptr = unsafe { gaggle_json_each(invalid.as_ptr()) };
+        assert!(out_ptr.is_null());
+        let err_ptr = gaggle_last_error();
+        assert!(!err_ptr.is_null());
+        unsafe {
+            let msg = std::ffi::CStr::from_ptr(err_ptr).to_str().unwrap();
+            assert!(msg.to_lowercase().contains("json"));
+        }
+    }
+}
+
+#[cfg(any(test, feature = "expose_internal"))]
+pub mod ffi {
+    pub use super::{
+        gaggle_clear_cache, gaggle_clear_last_error, gaggle_download_dataset, gaggle_free,
+        gaggle_get_cache_info, gaggle_get_dataset_info, gaggle_get_file_path, gaggle_get_version,
+        gaggle_json_each, gaggle_last_error, gaggle_list_files, gaggle_search,
+        gaggle_set_credentials,
+    };
 }

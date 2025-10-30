@@ -53,10 +53,8 @@ the [DuckDB community extensions](https://duckdb.org/community_extensions/extens
 following SQL commands in the DuckDB shell:
 
 ```sql
-install
-gaggle from community;
-load
-gaggle;
+install gaggle from community;
+load gaggle;
 ```
 
 #### Build from Source
@@ -96,68 +94,32 @@ load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 select gaggle_set_credentials('your-username', 'your-api-key');
 
 -- Get extension version
-select gaggle_get_version();
+select gaggle_version();
 
--- Download and get local path
+-- Prime cache by downloading the dataset locally (optional, but improves first-time performance)
 select gaggle_download('habedi/flickr-8k-dataset-clean');
 
--- Get raw JSON results from search
-select gaggle_search('flickr', 1, 10) as search_results;
-
-select gaggle_list_files('habedi/flickr-8k-dataset-clean') as files;
-
-select gaggle_info('habedi/flickr-8k-dataset-clean') as metadata;
-
--- Read a CSV file directly from local path after download
+-- List files in the downloaded dataset
 select *
-from read_csv_auto('/path/to/downloaded/dataset/file.csv') limit 10;
+from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
+
+-- Read a Parquet file from local cache using a prepared statement (no subquery in function args)
+prepare rp as select * from read_parquet(?) limit 10;
+execute rp(gaggle_file_paths('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
+
+-- Use the replacement scan to read directly via kaggle: URL
+select count(*)
+from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
+
+-- Or glob Parquet files in a dataset directory
+select count(*)
+from 'kaggle:habedi/flickr-8k-dataset-clean/*.parquet';
+
+-- Optionally, check cache info
+select gaggle_cache_info();
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
-
-#### API Functions
-
-| Function                                | Description                              |
-|-----------------------------------------|------------------------------------------|
-| `gaggle_set_credentials(username, key)` | Set Kaggle API credentials               |
-| `gaggle_search(query, page, page_size)` | Search for datasets on Kaggle            |
-| `gaggle_download(dataset_path)`         | Download a dataset and return local path |
-| `gaggle_list_files(dataset_path)`       | List files in a dataset (JSON array)     |
-| `gaggle_info(dataset_path)`             | Get dataset metadata (JSON object)       |
-| `gaggle_get_version()`                  | Get extension version info               |
-| `gaggle_clear_cache()`                  | Clear the local dataset cache            |
-| `gaggle_get_cache_info()`               | Get cache statistics                     |
-
-#### Configuration
-
-Gaggle can be configured via environment variables:
-
-- `KAGGLE_USERNAME` - Your Kaggle username
-- `KAGGLE_KEY` - Your Kaggle API key
-- `GAGGLE_CACHE_DIR` - Directory for caching datasets (default: system cache dir)
-- `GAGGLE_VERBOSE` - Enable verbose logging (default: false)
-- `GAGGLE_HTTP_TIMEOUT` - HTTP timeout in seconds (default: 30)
-
-Alternatively, create `~/.kaggle/kaggle.json`:
-
-```json
-{
-    "username": "your-username",
-    "key": "your-api-key"
-}
-```
-
-##### JSON Parsing
-
-> [!TIP]
-> Gaggle returns JSON data for search results, file lists, and metadata.
-> For advanced JSON parsing, you can optionally load the JSON DuckDB extension:
-> ```sql
-> install json;
-> load json;
-> select * from json_each(gaggle_search('covid-19', 1, 10));
-> ```
-> If the JSON extension is not available, you can still access the raw JSON strings and work with them directly.
 
 ---
 

@@ -55,13 +55,14 @@ Start DuckDB and run:
 
 ```sql
 -- Load the extension
-LOAD 'build/release/extension/gaggle/gaggle.duckdb_extension';
+LOAD
+'build/release/extension/gaggle/gaggle.duckdb_extension';
 
 -- If you didn't use a config file, set credentials
 SELECT gaggle_set_credentials('your-username', 'your-api-key');
 
 -- Search for datasets
-SELECT json_extract_string(value, '$.ref') as dataset,
+SELECT json_extract_string(value, '$.ref')   as dataset,
        json_extract_string(value, '$.title') as title
 FROM json_each(gaggle_search('titanic', 1, 5));
 
@@ -75,12 +76,12 @@ FROM json_each(gaggle_list_files('heptapod/titanic'));
 -- Read and analyze data
 SELECT Pclass,
        Sex,
-       COUNT(*) as passengers,
-       AVG(Age) as avg_age,
+       COUNT(*)                         as passengers,
+       AVG(Age)                         as avg_age,
        SUM(Survived) * 100.0 / COUNT(*) as survival_rate
 FROM read_csv_auto(
-    (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
-)
+        (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
+     )
 GROUP BY Pclass, Sex
 ORDER BY Pclass, Sex;
 ```
@@ -91,16 +92,17 @@ ORDER BY Pclass, Sex;
 
 ```sql
 -- Search for COVID datasets
-SELECT * FROM json_each(gaggle_search('covid-19', 1, 10));
+SELECT *
+FROM json_each(gaggle_search('covid-19', 1, 10));
 
 -- Download and query
 SELECT location, date, new_cases
 FROM read_csv_auto(
     (SELECT gaggle_download('owid/covid-latest-data') || '/owid-covid-latest.csv')
-)
+    )
 WHERE location = 'United States'
 ORDER BY date DESC
-LIMIT 10;
+    LIMIT 10;
 ```
 
 ### Use Case 2: Create a Persistent View
@@ -111,12 +113,15 @@ SELECT gaggle_download('userid/dataset');
 
 -- Create view for easy access
 CREATE VIEW my_data AS
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('userid/dataset') || '/data.csv')
-);
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('userid/dataset') || '/data.csv')
+     );
 
 -- Query like a regular table
-SELECT * FROM my_data WHERE category = 'A' LIMIT 100;
+SELECT *
+FROM my_data
+WHERE category = 'A' LIMIT 100;
 ```
 
 ### Use Case 3: Join Multiple Datasets
@@ -127,18 +132,22 @@ SELECT gaggle_download('dataset1/name');
 SELECT gaggle_download('dataset2/name');
 
 -- Create views
-CREATE VIEW users AS SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('dataset1/name') || '/users.csv')
-);
+CREATE VIEW users AS
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('dataset1/name') || '/users.csv')
+     );
 
-CREATE VIEW transactions AS SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('dataset2/name') || '/transactions.csv')
-);
+CREATE VIEW transactions AS
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('dataset2/name') || '/transactions.csv')
+     );
 
 -- Join them
 SELECT u.name, COUNT(t.id) as transaction_count, SUM(t.amount) as total
 FROM users u
-LEFT JOIN transactions t ON u.id = t.user_id
+         LEFT JOIN transactions t ON u.id = t.user_id
 GROUP BY u.name
 ORDER BY total DESC;
 ```
@@ -149,7 +158,8 @@ ORDER BY total DESC;
 
 ```sql
 -- Check cache size
-SELECT * FROM json_each(gaggle_get_cache_info());
+SELECT *
+FROM json_each(gaggle_get_cache_info());
 
 -- Clear cache if needed
 SELECT gaggle_clear_cache();

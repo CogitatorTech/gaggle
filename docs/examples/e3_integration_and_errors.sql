@@ -1,6 +1,3 @@
--- Gaggle Integration and Error Handling Examples
--- Demonstrates error handling and integration patterns with DuckDB queries
-
 .echo on
 
 -- section 1: Set up
@@ -9,15 +6,20 @@ select gaggle_set_credentials('your-username', 'your-api-key') as credentials_se
 
 -- section 2: Error handling - missing dataset
 select '## Handle missing dataset error';
-select gaggle_info('nonexistent/dataset-name') as error_result;
-select gaggle_last_error() as last_error_message;
+-- This will raise an error that can be observed in the shell
+-- You can wrap it in a client-side try/catch depending on your environment
+-- Example: attempt to fetch info for a non-existent dataset
+-- select gaggle_info('nonexistent/dataset-name');
 
--- section 3: Query integration - filter dataset results
+-- section 3: Query integration - filter dataset results (parse JSON)
 select '## Filter search results';
 with search_results as (
-  select gaggle_search('titanic', 1, 10) as results
+  select from_json(gaggle_search('titanic', 1, 10)) as j
 )
-select results from search_results;
+select json_extract_string(value, '$.ref') as ref,
+       json_extract_string(value, '$.title') as title
+from json_each((select j from search_results))
+limit 5;
 
 -- section 4: Integration - bulk dataset operations
 select '## Batch dataset operations';
@@ -34,14 +36,7 @@ select dataset_name,
 from datasets
 limit 1;
 
--- section 5: Error handling - null inputs
-select '## Handle null pointer inputs';
--- These would fail with proper error handling
--- select gaggle_info(null) as null_input_error;
--- Instead verify the error was caught:
-select 'Null inputs are handled by gaggle_last_error()' as note;
-
--- section 6: Cleanup
+-- section 5: Cleanup
 select '## Cleanup';
 drop table datasets;
 

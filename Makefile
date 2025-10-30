@@ -51,7 +51,7 @@ rust-format: ## Format Rust files
 .PHONY: rust-test
 rust-test: rust-format ## Run tests
 	@echo "Running the unit tests for Gaggle..."
-	@cargo test --manifest-path gaggle/Cargo.toml --all-targets -- --nocapture
+	@cargo test --manifest-path gaggle/Cargo.toml --all-targets --features "expose_internal" -- --nocapture
 
 .PHONY: rust-coverage
 rust-coverage: ## Generate code coverage report for Gaggle crate

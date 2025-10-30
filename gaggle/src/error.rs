@@ -81,6 +81,13 @@ pub(crate) fn set_last_error(err: &GaggleError) {
     }
 }
 
+/// Internal function to clear the last error (callable from Rust code)
+pub(crate) fn clear_last_error_internal() {
+    LAST_ERROR.with(|cell| {
+        *cell.borrow_mut() = None;
+    });
+}
+
 /// Retrieves the last error message set in the current thread.
 ///
 /// After an FFI function returns an error code, this function can be called
@@ -97,6 +104,17 @@ pub extern "C" fn gaggle_last_error() -> *const c_char {
         Some(ref c_string) => c_string.as_ptr(),
         None => std::ptr::null(),
     })
+}
+
+/// Clears the last error for the current thread.
+///
+/// This is useful for ensuring that old error messages don't persist
+/// and get confused with new errors.
+#[no_mangle]
+pub extern "C" fn gaggle_clear_last_error() {
+    LAST_ERROR.with(|cell| {
+        *cell.borrow_mut() = None;
+    });
 }
 
 #[cfg(test)]
@@ -168,6 +186,50 @@ mod tests {
     }
 
     #[test]
+    fn test_clear_last_error() {
+        use super::*;
+
+        // Set an error
+        let err = GaggleError::NullPointer;
+        set_last_error(&err);
+
+        // Verify it's set
+        let err_ptr = gaggle_last_error();
+        assert!(!err_ptr.is_null());
+
+        // Clear it
+        gaggle_clear_last_error();
+
+        // Verify it's cleared
+        let err_ptr = gaggle_last_error();
+        assert!(err_ptr.is_null());
+    }
+
+    #[test]
+    fn test_clear_last_error_when_none_set() {
+        // Clearing when no error is set should not panic
+        gaggle_clear_last_error();
+        let err_ptr = gaggle_last_error();
+        assert!(err_ptr.is_null());
+    }
+
+    #[test]
+    fn test_error_cleared_after_multiple_sets() {
+        use super::*;
+
+        // Set multiple errors
+        set_last_error(&GaggleError::NullPointer);
+        set_last_error(&GaggleError::Utf8Error);
+        set_last_error(&GaggleError::IoError("test".to_string()));
+
+        // Clear
+        gaggle_clear_last_error();
+
+        // Should be null
+        assert!(gaggle_last_error().is_null());
+    }
+
+    #[test]
     fn test_from_utf8_error() {
         let invalid_utf8 = vec![0xff, 0xfe];
         let utf8_result = std::str::from_utf8(&invalid_utf8);
@@ -232,7 +294,6 @@ mod tests {
         for err in errors {
             let msg = err.to_string();
             assert!(!msg.is_empty());
-            assert!(msg.len() > 0);
         }
     }
 

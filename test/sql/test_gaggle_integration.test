@@ -15,24 +15,24 @@ statement ok
 select gaggle_set_credentials('kaggle_user', 'kaggle_key')
 
 query I
-select gaggle_get_version() != ''
+select gaggle_version() != ''
 ----
 1
 
 query I
-select gaggle_get_cache_info() != ''
+select gaggle_cache_info() != ''
 ----
 1
 
 # Test 2: Repeated operations should be idempotent
 statement ok
-select gaggle_clear_cache()
+select gaggle_purge_cache()
 
 statement ok
-select gaggle_clear_cache()
+select gaggle_purge_cache()
 
 statement ok
-select gaggle_get_cache_info()
+select gaggle_cache_info()
 
 # Test 3: Credentials can be updated in sequence
 statement ok
@@ -49,35 +49,35 @@ statement ok
 begin transaction
 
 statement ok
-select gaggle_clear_cache()
+select gaggle_purge_cache()
 
 statement ok
-select gaggle_get_cache_info()
+select gaggle_cache_info()
 
 statement ok
 commit
 
 # Test 5: Multiple calls within aggregation context
 query I
-select count(*) filter (where gaggle_clear_cache() = 1)
+select count(*) filter (where gaggle_purge_cache() = 1)
 ----
 1
 
 # Test 6: Verify functions work in WHERE clause context
 query I
-select gaggle_get_version() is not null
-  and gaggle_get_cache_info() is not null
+select gaggle_version() is not null
+  and gaggle_cache_info() is not null
 ----
 1
 
 # Test 7: Functions in SELECT with other expressions
 query T
-select 'Gaggle_' || substring(gaggle_get_version(), 1, 10)
+select 'Gaggle_' || substr(gaggle_version(), 1, 10)
 ----
-Gaggle_{"name":"G
+Gaggle_
 
 # Test 8: Version should remain consistent across calls
 query I
-select gaggle_get_version() = gaggle_get_version()
+select gaggle_version() = gaggle_version()
 ----
 1

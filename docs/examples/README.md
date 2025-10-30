@@ -1,6 +1,6 @@
 ## Examples
 
-This directory contains DuckDB SQL scripts that show usage patterns of the Infera extension.
+This directory contains DuckDB SQL scripts that show usage patterns of the Gaggle extension.
 Each file is self‑contained and can be executed in the DuckDB shell (or via `duckdb < file.sql`).
 
 ### Prerequisites

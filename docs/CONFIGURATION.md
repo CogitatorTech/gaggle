@@ -166,7 +166,8 @@ SELECT gaggle_info('username/dataset-name');
 
 ### Retry Policy Details (planned)
 
-Retry policy and exponential backoff are planned but not yet implemented. Current releases do not retry failed HTTP requests automatically.
+Retry policy and exponential backoff are planned but not yet implemented. Current releases do not retry failed HTTP
+requests automatically.
 
 ### Logging Levels (planned)
 
@@ -174,6 +175,8 @@ Detailed logging control via `GAGGLE_LOG_LEVEL` is planned but not yet implement
 
 ### Notes
 
-- Cache directory and HTTP timeout are checked at runtime. Changing `GAGGLE_CACHE_DIR` or `GAGGLE_HTTP_TIMEOUT` takes effect for subsequent operations in the same process.
-- Kaggle credentials can be provided via environment variables, config file, or the `gaggle_set_credentials()` SQL function.
+- Cache directory and HTTP timeout are checked at runtime. Changing `GAGGLE_CACHE_DIR` or `GAGGLE_HTTP_TIMEOUT` takes
+  effect for subsequent operations in the same process.
+- Kaggle credentials can be provided via environment variables, config file, or the `gaggle_set_credentials()` SQL
+  function.
 - Invalid values fall back to sensible defaults.

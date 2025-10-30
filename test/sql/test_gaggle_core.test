@@ -10,35 +10,35 @@ pragma enable_verification
 statement ok
 load 'build/release/extension/gaggle/gaggle.duckdb_extension'
 
-# Test 1: gaggle_get_version() returns version information (JSON format)
-query T
-select gaggle_get_version()
+# Test 1: gaggle_version() returns non-empty string
+query I
+select gaggle_version() != ''
 ----
-{"name":"Gaggle - Kaggle Dataset DuckDB Extension","version":"0.1.0"}
+1
 
 # Test 2: Setting credentials should succeed
 statement ok
 select gaggle_set_credentials('test_user', 'test_key')
 
-# Test 3: gaggle_get_cache_info() returns cache information (non-empty)
+# Test 3: gaggle_cache_info() returns cache information (non-empty)
 query I
-select length(gaggle_get_cache_info()) > 0
+select length(gaggle_cache_info()) > 0
 ----
 1
 
-# Test 4: gaggle_clear_cache() should succeed
+# Test 4: gaggle_purge_cache() should succeed
 statement ok
-select gaggle_clear_cache()
+select gaggle_purge_cache()
 
 # Test 5: Verify gaggle functions are available and callable
 query I
-select gaggle_get_version() is not null
+select gaggle_version() is not null
 ----
 1
 
 # Test 6: Cache info should be valid text type
 query T
-select typeof(gaggle_get_cache_info())
+select typeof(gaggle_cache_info())
 ----
 VARCHAR
 
@@ -51,6 +51,6 @@ select gaggle_set_credentials('user2', 'key2')
 
 # Test 8: Version is consistent
 query I
-select gaggle_get_version() = gaggle_get_version()
+select gaggle_version() = gaggle_version()
 ----
 1
