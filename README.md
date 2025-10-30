@@ -18,89 +18,25 @@ Kaggle Datasets for DuckDB
 
 ---
 
-Gaggle is a DuckDB extension that allows you to read and write Kaggle datasets directly in SQL queries,
-treating them as if they were regular DuckDB tables. It is developed in Rust and provides seamless integration
-with the Kaggle API for dataset discovery, download, and management.
+Gaggle is a DuckDB extension that allows you to read and write Kaggle datasets directly in SQL queries, as if
+they were DuckDB tables.
+It is written in Rust and uses the official Kaggle API to search, download, and manage datasets.
 
-### Motivation
-
-Data scientists and analysts often need to work with datasets from Kaggle. The traditional workflow involves:
-1. Manually downloading datasets from Kaggle's website
-2. Extracting ZIP files
-3. Loading CSV/Parquet files into your analysis environment
-4. Managing storage and updates
-
-Gaggle simplifies this workflow by integrating Kaggle datasets directly into DuckDB. You can:
-- Query Kaggle datasets as if they were local tables
-- Search and discover datasets without leaving SQL
-- Automatically cache datasets locally for fast access
-- Manage dataset versions and updates
+Kaggle hosts a large collection of very useful datasets for data science and machine learning work.
+Accessing these datasets typically involves multiple steps including manually downloading a dataset (as a ZIP file),
+extracting it, loading the files in the dataset into your data science environment, and managing storage and dataset
+updates, etc.
+This workflow can be simplified and optimized by bringing the datasets directly into DuckDB.
 
 ### Features
 
-- **Direct SQL access** to Kaggle datasets with `SELECT * FROM 'kaggle:owner/dataset/file.csv'`
-- **Search datasets** using `gaggle_search('query')`
-- **Download and cache** datasets automatically
-- **List files** in datasets before loading
-- **Get metadata** about datasets including size, description, and update info
-- **Credential management** via environment variables, config file, or SQL
-- **Automatic caching** for fast repeated access
+- Has a simple API (just a few SQL functions)
+- Allows you search, download, update, and delete Kaggle datasets directly from DuckDB
+- Supports datasets made of CSV, JSON, and Parquet files
+- Configurable and has built-in caching support
 - Thread-safe and memory-efficient
 
-### Quick Start
-
-```sql
--- Set your Kaggle credentials (or use ~/.kaggle/kaggle.json)
-SELECT gaggle_set_credentials('your-username', 'your-api-key');
-
--- Search for datasets
-SELECT * FROM json_each(gaggle_search('covid-19', 1, 10));
-
--- Read a Kaggle dataset directly
-SELECT * FROM 'kaggle:owid/covid-latest-data/owid-covid-latest.csv' LIMIT 10;
-
--- Download and get local path
-SELECT gaggle_download('owid/covid-latest-data');
-
--- List files in a dataset
-SELECT * FROM json_each(gaggle_list_files('owid/covid-latest-data'));
-
--- Get dataset metadata
-SELECT * FROM json_each(gaggle_info('owid/covid-latest-data'));
-```
-
-### API Functions
-
-| Function | Description |
-|----------|-------------|
-| `gaggle_set_credentials(username, key)` | Set Kaggle API credentials |
-| `gaggle_search(query, page, page_size)` | Search for datasets on Kaggle |
-| `gaggle_download(dataset_path)` | Download a dataset and return local path |
-| `gaggle_list_files(dataset_path)` | List files in a dataset (JSON array) |
-| `gaggle_info(dataset_path)` | Get dataset metadata (JSON object) |
-| `gaggle_get_version()` | Get extension version info |
-| `gaggle_clear_cache()` | Clear the local dataset cache |
-| `gaggle_get_cache_info()` | Get cache statistics |
-
-### Configuration
-
-Gaggle can be configured via environment variables:
-
-- `KAGGLE_USERNAME` - Your Kaggle username
-- `KAGGLE_KEY` - Your Kaggle API key
-- `GAGGLE_CACHE_DIR` - Directory for caching datasets (default: system cache dir)
-- `GAGGLE_VERBOSE` - Enable verbose logging (default: false)
-- `GAGGLE_HTTP_TIMEOUT` - HTTP timeout in seconds (default: 30)
-
-Alternatively, create `~/.kaggle/kaggle.json`:
-```json
-{
-  "username": "your-username",
-  "key": "your-api-key"
-}
-```
-
-See the [ROADMAP.md](ROADMAP.md) for planned features and the [docs](docs/) folder for detailed documentation.
+See the [ROADMAP.md](ROADMAP.md) for planned features and the [docs](docs) folder for detailed documentation.
 
 > [!IMPORTANT]
 > Gaggle is in early development, so bugs and breaking changes are expected.
@@ -117,8 +53,10 @@ the [DuckDB community extensions](https://duckdb.org/community_extensions/extens
 following SQL commands in the DuckDB shell:
 
 ```sql
-install gaggle from community;
-load gaggle;
+install
+gaggle from community;
+load
+gaggle;
 ```
 
 #### Build from Source
@@ -148,32 +86,78 @@ make release
 > You can download the pre-built binaries from the [releases page](https://github.com/CogitatorTech/gaggle/releases) for
 > your platform.
 
-
 #### Trying Gaggle
 
 ```sql
--- 0. Install and load Gaggle
--- Skip this step if you built from source and ran `./build/release/duckdb`
-install gaggle from community;
-load gaggle;
+-- Load the Gaggle extension
+load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 
--- 1. Load a simple linear model from a remote URL
-select gaggle_load_model('linear_model',
-                         'https://github.com/CogitatorTech/gaggle/raw/refs/heads/main/test/models/linear.onnx');
+-- Set your Kaggle credentials (or use `~/.kaggle/kaggle.json`)
+select gaggle_set_credentials('your-username', 'your-api-key');
 
--- 2. Run a prediction using a very simple linear model
--- Model: y = 2*x1 - 1*x2 + 0.5*x3 + 0.25
-select gaggle_predict('linear_model', 1.0, 2.0, 3.0);
--- Expected output: 1.75
-
--- 3. Unload the model when we're done with it
-select gaggle_unload_model('linear_model');
-
--- 4. Check the Gaggle version
+-- Get extension version
 select gaggle_get_version();
+
+-- Download and get local path
+select gaggle_download('habedi/flickr-8k-dataset-clean');
+
+-- Get raw JSON results from search
+select gaggle_search('flickr', 1, 10) as search_results;
+
+select gaggle_list_files('habedi/flickr-8k-dataset-clean') as files;
+
+select gaggle_info('habedi/flickr-8k-dataset-clean') as metadata;
+
+-- Read a CSV file directly from local path after download
+select *
+from read_csv_auto('/path/to/downloaded/dataset/file.csv') limit 10;
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
+
+#### API Functions
+
+| Function                                | Description                              |
+|-----------------------------------------|------------------------------------------|
+| `gaggle_set_credentials(username, key)` | Set Kaggle API credentials               |
+| `gaggle_search(query, page, page_size)` | Search for datasets on Kaggle            |
+| `gaggle_download(dataset_path)`         | Download a dataset and return local path |
+| `gaggle_list_files(dataset_path)`       | List files in a dataset (JSON array)     |
+| `gaggle_info(dataset_path)`             | Get dataset metadata (JSON object)       |
+| `gaggle_get_version()`                  | Get extension version info               |
+| `gaggle_clear_cache()`                  | Clear the local dataset cache            |
+| `gaggle_get_cache_info()`               | Get cache statistics                     |
+
+#### Configuration
+
+Gaggle can be configured via environment variables:
+
+- `KAGGLE_USERNAME` - Your Kaggle username
+- `KAGGLE_KEY` - Your Kaggle API key
+- `GAGGLE_CACHE_DIR` - Directory for caching datasets (default: system cache dir)
+- `GAGGLE_VERBOSE` - Enable verbose logging (default: false)
+- `GAGGLE_HTTP_TIMEOUT` - HTTP timeout in seconds (default: 30)
+
+Alternatively, create `~/.kaggle/kaggle.json`:
+
+```json
+{
+    "username": "your-username",
+    "key": "your-api-key"
+}
+```
+
+##### JSON Parsing
+
+> [!TIP]
+> Gaggle returns JSON data for search results, file lists, and metadata.
+> For advanced JSON parsing, you can optionally load the JSON DuckDB extension:
+> ```sql
+> install json;
+> load json;
+> select * from json_each(gaggle_search('covid-19', 1, 10));
+> ```
+> If the JSON extension is not available, you can still access the raw JSON strings and work with them directly.
 
 ---
 

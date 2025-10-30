@@ -2,13 +2,15 @@
 
 ## What We Accomplished
 
-Successfully transformed the **Gaggle** extension from an ML inference tool (Infera) into a **Kaggle Dataset DuckDB Extension** - enabling seamless access to Kaggle datasets directly from SQL!
+Successfully transformed the **Gaggle** extension from an ML inference tool (Infera) into a **Kaggle Dataset DuckDB
+Extension** - enabling seamless access to Kaggle datasets directly from SQL!
 
 ---
 
 ## ✅ Implementation Status
 
 ### Core Features ✅
+
 - [x] **Kaggle API Integration** - Full Rust client for Kaggle API
 - [x] **Credential Management** - Support for env vars, config file, and SQL function
 - [x] **Dataset Download** - Automatic download and caching with ZIP extraction
@@ -19,6 +21,7 @@ Successfully transformed the **Gaggle** extension from an ML inference tool (Inf
 - [x] **Error Handling** - Comprehensive error types and messages
 
 ### Documentation ✅
+
 - [x] **README.md** - Updated with new purpose and quick examples
 - [x] **QUICKSTART.md** - 5-minute getting started guide
 - [x] **docs/GAGGLE_GUIDE.md** - Comprehensive user guide
@@ -27,6 +30,7 @@ Successfully transformed the **Gaggle** extension from an ML inference tool (Inf
 - [x] **docs/examples/gaggle_usage.sql** - SQL usage examples
 
 ### Code Quality ✅
+
 - [x] All ML/inference code removed
 - [x] Clean separation of concerns (kaggle.rs, config.rs, error.rs, lib.rs)
 - [x] Proper error handling with custom error types
@@ -71,19 +75,23 @@ gaggle/
 ## 🚀 API Functions
 
 ### Credential Management
+
 - `gaggle_set_credentials(username, key)` → Set API credentials
 
 ### Dataset Operations
+
 - `gaggle_download(dataset_path)` → Download and cache dataset
 - `gaggle_list_files(dataset_path)` → List files in JSON format
 - `gaggle_info(dataset_path)` → Get dataset metadata
 - `gaggle_search(query, page, page_size)` → Search datasets
 
 ### Cache Management
+
 - `gaggle_clear_cache()` → Clear all cached datasets
 - `gaggle_get_cache_info()` → Get cache statistics
 
 ### Utility
+
 - `gaggle_get_version()` → Get extension version
 
 ---
@@ -91,6 +99,7 @@ gaggle/
 ## 🔧 Technology Stack
 
 ### Rust Dependencies
+
 ```toml
 # Core
 once_cell = "1.19"          # Lazy statics
@@ -114,6 +123,7 @@ urlencoding = "2.1"         # URL encoding
 ```
 
 ### Removed (Old ML Dependencies)
+
 - ❌ tract-onnx - ML inference engine
 - ❌ ndarray - Array operations
 - ❌ sha2, hex, filetime - Model caching
@@ -123,40 +133,48 @@ urlencoding = "2.1"         # URL encoding
 ## 📖 Usage Examples
 
 ### Quick Example
+
 ```sql
-LOAD gaggle;
+LOAD
+gaggle;
 SELECT gaggle_set_credentials('user', 'key');
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
-) LIMIT 10;
+SELECT *
+FROM read_csv_auto(
+             (SELECT gaggle_download('heptapod/titanic') || '/train.csv')
+     ) LIMIT 10;
 ```
 
 ### Search and Explore
+
 ```sql
 -- Find datasets
-SELECT * FROM json_each(gaggle_search('covid', 1, 10));
+SELECT *
+FROM json_each(gaggle_search('covid', 1, 10));
 
 -- Get info
-SELECT * FROM json_each(gaggle_info('owid/covid-latest-data'));
+SELECT *
+FROM json_each(gaggle_info('owid/covid-latest-data'));
 
 -- List files
-SELECT * FROM json_each(gaggle_list_files('owid/covid-latest-data'));
+SELECT *
+FROM json_each(gaggle_list_files('owid/covid-latest-data'));
 ```
 
 ### Analytics Workflow
+
 ```sql
 -- Download and create view
 CREATE VIEW covid AS
-SELECT * FROM read_csv_auto(
-    (SELECT gaggle_download('owid/covid-latest-data') || '/data.csv')
-);
+SELECT *
+FROM read_csv_auto(
+        (SELECT gaggle_download('owid/covid-latest-data') || '/data.csv')
+     );
 
 -- Query like a regular table
 SELECT location, MAX(total_cases)
 FROM covid
 GROUP BY location
-ORDER BY MAX(total_cases) DESC
-LIMIT 10;
+ORDER BY MAX(total_cases) DESC LIMIT 10;
 ```
 
 ---
@@ -183,14 +201,14 @@ make test
 
 ## 🎯 What's Different from Infera?
 
-| Aspect | Infera (Old) | Gaggle (New) |
-|--------|--------------|--------------|
-| **Purpose** | ML model inference | Kaggle dataset access |
-| **Backend** | Tract (ONNX runtime) | Kaggle API |
-| **Primary Use** | `infera_predict(model, features)` | `read_csv_auto(kaggle_download(...))` |
-| **Dependencies** | ML libraries (tract, ndarray) | HTTP & file handling (reqwest, zip) |
-| **Data Type** | Model tensors | CSV, Parquet, JSON files |
-| **API Focus** | Model management | Dataset discovery & download |
+| Aspect           | Infera (Old)                      | Gaggle (New)                          |
+|------------------|-----------------------------------|---------------------------------------|
+| **Purpose**      | ML model inference                | Kaggle dataset access                 |
+| **Backend**      | Tract (ONNX runtime)              | Kaggle API                            |
+| **Primary Use**  | `infera_predict(model, features)` | `read_csv_auto(kaggle_download(...))` |
+| **Dependencies** | ML libraries (tract, ndarray)     | HTTP & file handling (reqwest, zip)   |
+| **Data Type**    | Model tensors                     | CSV, Parquet, JSON files              |
+| **API Focus**    | Model management                  | Dataset discovery & download          |
 
 ---
 
@@ -209,10 +227,10 @@ make test
    ```
 
 3. **Create Tests** 🧪
-   - Create `test/sql/test_kaggle_basics.test`
-   - Test credential management
-   - Test download and read
-   - Test search functionality
+    - Create `test/sql/test_kaggle_basics.test`
+    - Test credential management
+    - Test download and read
+    - Test search functionality
 
 4. **Test Manually** 🔬
    ```sql
@@ -221,9 +239,9 @@ make test
    ```
 
 5. **Update Remaining Files** 📄
-   - Remove old test files in `test/sql/test_*inference*.test`
-   - Update `test/README.md`
-   - Clean up old example files
+    - Remove old test files in `test/sql/test_*inference*.test`
+    - Update `test/README.md`
+    - Clean up old example files
 
 ---
 
@@ -235,23 +253,23 @@ make test
 ✅ **Credential Flexibility** - Multiple ways to authenticate  
 ✅ **Full Discovery** - Search datasets from SQL  
 ✅ **Standard Formats** - Works with CSV, Parquet, JSON  
-✅ **DuckDB Native** - Seamless integration  
+✅ **DuckDB Native** - Seamless integration
 
 ---
 
 ## 🐛 Known Issues & Limitations
 
 1. ⚠️ **No Direct Table Function Yet** - Use `read_csv_auto()` wrapper
-   - Planned: `SELECT * FROM kaggle('owner/dataset/file.csv')`
+    - Planned: `SELECT * FROM kaggle('owner/dataset/file.csv')`
 
 2. ⚠️ **No Upload Functionality** - Read-only for now
-   - Planned for future release
+    - Planned for future release
 
 3. ⚠️ **Rate Limits** - Subject to Kaggle API rate limits
-   - Monitor usage on Kaggle
+    - Monitor usage on Kaggle
 
 4. ⚠️ **Large Datasets** - May take time to download initially
-   - Cached after first download
+    - Cached after first download
 
 ---
 
@@ -269,18 +287,21 @@ make test
 ## 🔮 Future Enhancements
 
 ### Short Term
+
 - [ ] Direct table function: `FROM kaggle('owner/dataset/file')`
 - [ ] Progress indicators for downloads
 - [ ] Automatic file type detection
 - [ ] Comprehensive test suite
 
 ### Medium Term
+
 - [ ] Upload functionality from DuckDB tables
 - [ ] Kaggle Competitions integration
 - [ ] Dataset version management
 - [ ] Parallel downloads for large files
 
 ### Long Term
+
 - [ ] DuckDB replacement scan: `FROM 'kaggle:...'`
 - [ ] Streaming for very large datasets
 - [ ] Incremental dataset updates
@@ -314,7 +335,8 @@ The Gaggle extension is now a fully-functional Kaggle dataset integration for Du
 
 ```sql
 -- Your first Gaggle query awaits!
-LOAD gaggle;
+LOAD
+gaggle;
 SELECT gaggle_search('machine learning', 1, 5);
 ```
 

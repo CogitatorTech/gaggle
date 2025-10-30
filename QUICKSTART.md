@@ -189,6 +189,7 @@ SELECT gaggle_download('dataset1/name') as d1,
 ### Problem: "No Kaggle credentials found"
 
 **Solution:**
+
 ```sql
 -- Set credentials in SQL
 SELECT gaggle_set_credentials('username', 'api-key');
@@ -203,6 +204,7 @@ SELECT gaggle_set_credentials('username', 'api-key');
 ### Problem: "Dataset not found"
 
 **Check:**
+
 1. Dataset exists on Kaggle
 2. You have access (some datasets require joining competitions)
 3. Path format is correct: `owner/dataset-name`

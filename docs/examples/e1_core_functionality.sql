@@ -1,35 +1,36 @@
--- core functionality walkthrough (load -> info -> predict -> unload)
+-- Gaggle Core Functionality Examples
+-- Demonstrates basic Kaggle dataset operations: credentials, search, download, list files
+
 .echo on
-load infera;
 
--- section 1: version & initial state
-select '## version & initial state';
-select infera_get_version() as version_json;           -- shows version, backend, cache dir
-select infera_get_loaded_models() as initial_models;   -- expect []
+-- section 1: Load extension and get version
+select '## Load extension and get version';
+load 'build/release/extension/gaggle/gaggle.duckdb_extension';
+select gaggle_get_version() as version_info;
 
--- section 2: load model and inspect
-select '## load model';
-select infera_load_model('linear', 'test/models/linear.onnx') as loaded;  -- expect true
-select instr(infera_get_loaded_models(), 'linear') > 0 as is_listed;      -- expect 1/true
-select infera_get_model_info('linear') as model_info;                     -- contains input/output shapes
-select position('"input_shape"' in infera_get_model_info('linear')) > 0 as has_input_shape; -- expect true
+-- section 2: Set Kaggle credentials
+select '## Set Kaggle credentials';
+-- Method 1: Set directly (or use KAGGLE_USERNAME/KAGGLE_KEY env vars or ~/.kaggle/kaggle.json)
+select gaggle_set_credentials('your-username', 'your-api-key') as credentials_set;
 
--- section 3: prediction
--- model formula documented in tests: y = 2*f1 - 1*f2 + 0.5*f3 + 0.25
-select '## prediction';
-select infera_predict('linear', 1.0, 2.0, 3.0) as prediction;            -- expect 1.75
-select abs(infera_predict('linear', 1.0, 2.0, 3.0) - 1.75) < 1e-5 as prediction_ok; -- expect true
-select infera_predict_multi('linear', 1.0, 2.0, 3.0) as predict_multi;   -- single value inside list-like string
+-- section 3: Search for datasets
+select '## Search for datasets';
+select gaggle_search('covid', 1, 5) as search_results;
 
--- section 4: unload
-select '## unload';
-select infera_unload_model('linear') as unloaded;                         -- expect true
-select infera_get_loaded_models() as after_unload;                        -- expect []
+-- section 4: Download a dataset
+select '## Download a dataset';
+select gaggle_download('owid/covid-latest-data') as download_path;
 
--- section 5: autoload (reuse existing test/models directory)
-select '## autoload';
-select infera_set_autoload_dir('test/models') as autoload_result;         -- loads linear (& others if added)
-select instr(infera_get_loaded_models(), 'linear') > 0 as autoload_contains_linear; -- expect true
-select infera_unload_model('linear') as unload_after_autoload;            -- true (idempotent)
+-- section 5: List files in a dataset
+select '## List files in a dataset';
+select gaggle_list_files('owid/covid-latest-data') as files_json;
+
+-- section 6: Get dataset metadata
+select '## Get dataset metadata';
+select gaggle_info('owid/covid-latest-data') as dataset_metadata;
+
+-- section 7: Get cache information
+select '## Get cache information';
+select gaggle_get_cache_info() as cache_info;
 
 .echo off

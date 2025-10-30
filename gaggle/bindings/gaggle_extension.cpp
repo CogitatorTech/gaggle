@@ -10,8 +10,8 @@
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/main/extension/extension_loader.hpp"
-#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "duckdb/parser/parsed_data/create_pragma_function_info.hpp"
+#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -37,11 +37,15 @@ static std::string GetGaggleError() {
 /**
  * @brief Implements the `gaggle_set_credentials(username, key)` SQL function.
  */
-static void SetCredentials(DataChunk &args, ExpressionState &state, Vector &result) {
+static void SetCredentials(DataChunk &args, ExpressionState &state,
+                           Vector &result) {
   if (args.ColumnCount() != 2) {
-    throw InvalidInputException("gaggle_set_credentials(username, key) expects exactly 2 arguments");
+    throw InvalidInputException(
+        "gaggle_set_credentials(username, key) expects exactly 2 arguments");
   }
-  if (args.size() == 0) { return; }
+  if (args.size() == 0) {
+    return;
+  }
 
   auto username_val = args.data[0].GetValue(0);
   auto key_val = args.data[1].GetValue(0);
@@ -57,7 +61,8 @@ static void SetCredentials(DataChunk &args, ExpressionState &state, Vector &resu
   bool success = rc == 0;
 
   if (!success) {
-    throw InvalidInputException("Failed to set credentials: " + GetGaggleError());
+    throw InvalidInputException("Failed to set credentials: " +
+                                GetGaggleError());
   }
 
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -68,11 +73,15 @@ static void SetCredentials(DataChunk &args, ExpressionState &state, Vector &resu
 /**
  * @brief Implements the `gaggle_download(dataset_path)` SQL function.
  */
-static void DownloadDataset(DataChunk &args, ExpressionState &state, Vector &result) {
+static void DownloadDataset(DataChunk &args, ExpressionState &state,
+                            Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("gaggle_download(dataset_path) expects exactly 1 argument");
+    throw InvalidInputException(
+        "gaggle_download(dataset_path) expects exactly 1 argument");
   }
-  if (args.size() == 0) { return; }
+  if (args.size() == 0) {
+    return;
+  }
 
   auto path_val = args.data[0].GetValue(0);
   if (path_val.IsNull()) {
@@ -83,11 +92,13 @@ static void DownloadDataset(DataChunk &args, ExpressionState &state, Vector &res
   char *local_path = gaggle_download_dataset(path_str.c_str());
 
   if (local_path == nullptr) {
-    throw InvalidInputException("Failed to download dataset: " + GetGaggleError());
+    throw InvalidInputException("Failed to download dataset: " +
+                                GetGaggleError());
   }
 
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, local_path);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, local_path);
   ConstantVector::SetNull(result, false);
   gaggle_free(local_path);
 }
@@ -97,9 +108,12 @@ static void DownloadDataset(DataChunk &args, ExpressionState &state, Vector &res
  */
 static void ListFiles(DataChunk &args, ExpressionState &state, Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("gaggle_list_files(dataset_path) expects exactly 1 argument");
+    throw InvalidInputException(
+        "gaggle_list_files(dataset_path) expects exactly 1 argument");
   }
-  if (args.size() == 0) { return; }
+  if (args.size() == 0) {
+    return;
+  }
 
   auto path_val = args.data[0].GetValue(0);
   if (path_val.IsNull()) {
@@ -114,7 +128,8 @@ static void ListFiles(DataChunk &args, ExpressionState &state, Vector &result) {
   }
 
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, files_json);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, files_json);
   ConstantVector::SetNull(result, false);
   gaggle_free(files_json);
 }
@@ -122,11 +137,15 @@ static void ListFiles(DataChunk &args, ExpressionState &state, Vector &result) {
 /**
  * @brief Implements the `gaggle_search(query, page, page_size)` SQL function.
  */
-static void SearchDatasets(DataChunk &args, ExpressionState &state, Vector &result) {
+static void SearchDatasets(DataChunk &args, ExpressionState &state,
+                           Vector &result) {
   if (args.ColumnCount() != 3) {
-    throw InvalidInputException("gaggle_search(query, page, page_size) expects exactly 3 arguments");
+    throw InvalidInputException(
+        "gaggle_search(query, page, page_size) expects exactly 3 arguments");
   }
-  if (args.size() == 0) { return; }
+  if (args.size() == 0) {
+    return;
+  }
 
   auto query_val = args.data[0].GetValue(0);
   auto page_val = args.data[1].GetValue(0);
@@ -138,16 +157,19 @@ static void SearchDatasets(DataChunk &args, ExpressionState &state, Vector &resu
 
   std::string query_str = query_val.ToString();
   int32_t page = page_val.IsNull() ? 1 : page_val.GetValue<int32_t>();
-  int32_t page_size = page_size_val.IsNull() ? 20 : page_size_val.GetValue<int32_t>();
+  int32_t page_size =
+      page_size_val.IsNull() ? 20 : page_size_val.GetValue<int32_t>();
 
   char *results_json = gaggle_search(query_str.c_str(), page, page_size);
 
   if (results_json == nullptr) {
-    throw InvalidInputException("Failed to search datasets: " + GetGaggleError());
+    throw InvalidInputException("Failed to search datasets: " +
+                                GetGaggleError());
   }
 
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, results_json);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, results_json);
   ConstantVector::SetNull(result, false);
   gaggle_free(results_json);
 }
@@ -155,11 +177,15 @@ static void SearchDatasets(DataChunk &args, ExpressionState &state, Vector &resu
 /**
  * @brief Implements the `gaggle_info(dataset_path)` SQL function.
  */
-static void GetDatasetInfo(DataChunk &args, ExpressionState &state, Vector &result) {
+static void GetDatasetInfo(DataChunk &args, ExpressionState &state,
+                           Vector &result) {
   if (args.ColumnCount() != 1) {
-    throw InvalidInputException("gaggle_info(dataset_path) expects exactly 1 argument");
+    throw InvalidInputException(
+        "gaggle_info(dataset_path) expects exactly 1 argument");
   }
-  if (args.size() == 0) { return; }
+  if (args.size() == 0) {
+    return;
+  }
 
   auto path_val = args.data[0].GetValue(0);
   if (path_val.IsNull()) {
@@ -170,11 +196,13 @@ static void GetDatasetInfo(DataChunk &args, ExpressionState &state, Vector &resu
   char *info_json = gaggle_get_dataset_info(path_str.c_str());
 
   if (info_json == nullptr) {
-    throw InvalidInputException("Failed to get dataset info: " + GetGaggleError());
+    throw InvalidInputException("Failed to get dataset info: " +
+                                GetGaggleError());
   }
 
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, info_json);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, info_json);
   ConstantVector::SetNull(result, false);
   gaggle_free(info_json);
 }
@@ -182,10 +210,12 @@ static void GetDatasetInfo(DataChunk &args, ExpressionState &state, Vector &resu
 /**
  * @brief Implements the `gaggle_get_version()` SQL function.
  */
-static void GetVersion(DataChunk &args, ExpressionState &state, Vector &result) {
+static void GetVersion(DataChunk &args, ExpressionState &state,
+                       Vector &result) {
   char *info_json_c = gaggle_get_version();
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, info_json_c);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, info_json_c);
   ConstantVector::SetNull(result, false);
   gaggle_free(info_json_c);
 }
@@ -193,7 +223,8 @@ static void GetVersion(DataChunk &args, ExpressionState &state, Vector &result) 
 /**
  * @brief Implements the `gaggle_clear_cache()` SQL function.
  */
-static void ClearCache(DataChunk &args, ExpressionState &state, Vector &result) {
+static void ClearCache(DataChunk &args, ExpressionState &state,
+                       Vector &result) {
   int rc = gaggle_clear_cache();
   bool success = rc == 0;
   if (!success) {
@@ -207,10 +238,12 @@ static void ClearCache(DataChunk &args, ExpressionState &state, Vector &result) 
 /**
  * @brief Implements the `gaggle_get_cache_info()` SQL function.
  */
-static void GetCacheInfo(DataChunk &args, ExpressionState &state, Vector &result) {
+static void GetCacheInfo(DataChunk &args, ExpressionState &state,
+                         Vector &result) {
   char *cache_info_json = gaggle_get_cache_info();
   result.SetVectorType(VectorType::CONSTANT_VECTOR);
-  ConstantVector::GetData<string_t>(result)[0] = StringVector::AddString(result, cache_info_json);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, cache_info_json);
   ConstantVector::SetNull(result, false);
   gaggle_free(cache_info_json);
 }
@@ -224,15 +257,17 @@ struct KaggleReadBindData : public TableFunctionData {
   string local_path;
 };
 
-static unique_ptr<FunctionData> KaggleReadBind(ClientContext &context, TableFunctionBindInput &input,
-                                                vector<LogicalType> &return_types, vector<string> &names) {
+static unique_ptr<FunctionData>
+KaggleReadBind(ClientContext &context, TableFunctionBindInput &input,
+               vector<LogicalType> &return_types, vector<string> &names) {
   auto result = make_uniq<KaggleReadBindData>();
 
   result->dataset_path = input.inputs[0].ToString();
   result->filename = input.inputs[1].ToString();
 
   // Get the local file path
-  char *file_path = gaggle_get_file_path(result->dataset_path.c_str(), result->filename.c_str());
+  char *file_path = gaggle_get_file_path(result->dataset_path.c_str(),
+                                         result->filename.c_str());
   if (file_path == nullptr) {
     throw InvalidInputException("Failed to get file path: " + GetGaggleError());
   }
@@ -242,13 +277,15 @@ static unique_ptr<FunctionData> KaggleReadBind(ClientContext &context, TableFunc
   return std::move(result);
 }
 
-static void KaggleReadFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+static void KaggleReadFunction(ClientContext &context,
+                               TableFunctionInput &data_p, DataChunk &output) {
   // The actual data reading is delegated to DuckDB's CSV reader
   // This is handled by the replacement scan
 }
 
-static unique_ptr<TableRef> KaggleReplacementScan(ClientContext &context, const string &table_name,
-                                                    ReplacementScanData *data) {
+static unique_ptr<TableRef> KaggleReplacementScan(ClientContext &context,
+                                                  const string &table_name,
+                                                  ReplacementScanData *data) {
   // Check if table_name starts with "kaggle:"
   if (!StringUtil::StartsWith(table_name, "kaggle:")) {
     return nullptr;
@@ -265,7 +302,8 @@ static unique_ptr<TableRef> KaggleReplacementScan(ClientContext &context, const 
   string filename = kaggle_ref.substr(last_slash + 1);
 
   // Get the local file path
-  char *file_path = gaggle_get_file_path(dataset_path.c_str(), filename.c_str());
+  char *file_path =
+      gaggle_get_file_path(dataset_path.c_str(), filename.c_str());
   if (file_path == nullptr) {
     return nullptr;
   }
@@ -282,22 +320,27 @@ static unique_ptr<TableRef> KaggleReplacementScan(ClientContext &context, const 
  */
 static void LoadInternal(ExtensionLoader &loader) {
   // Scalar functions
-  loader.RegisterFunction(ScalarFunction("gaggle_set_credentials",
-    {LogicalType::VARCHAR, LogicalType::VARCHAR}, LogicalType::BOOLEAN, SetCredentials));
-  loader.RegisterFunction(ScalarFunction("gaggle_download",
-    {LogicalType::VARCHAR}, LogicalType::VARCHAR, DownloadDataset));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_set_credentials", {LogicalType::VARCHAR, LogicalType::VARCHAR},
+      LogicalType::BOOLEAN, SetCredentials));
+  loader.RegisterFunction(
+      ScalarFunction("gaggle_download", {LogicalType::VARCHAR},
+                     LogicalType::VARCHAR, DownloadDataset));
   loader.RegisterFunction(ScalarFunction("gaggle_list_files",
-    {LogicalType::VARCHAR}, LogicalType::VARCHAR, ListFiles));
-  loader.RegisterFunction(ScalarFunction("gaggle_search",
-    {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER}, LogicalType::VARCHAR, SearchDatasets));
-  loader.RegisterFunction(ScalarFunction("gaggle_info",
-    {LogicalType::VARCHAR}, LogicalType::VARCHAR, GetDatasetInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_get_version",
-    {}, LogicalType::VARCHAR, GetVersion));
-  loader.RegisterFunction(ScalarFunction("gaggle_clear_cache",
-    {}, LogicalType::BOOLEAN, ClearCache));
-  loader.RegisterFunction(ScalarFunction("gaggle_get_cache_info",
-    {}, LogicalType::VARCHAR, GetCacheInfo));
+                                         {LogicalType::VARCHAR},
+                                         LogicalType::VARCHAR, ListFiles));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_search",
+      {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER},
+      LogicalType::VARCHAR, SearchDatasets));
+  loader.RegisterFunction(ScalarFunction("gaggle_info", {LogicalType::VARCHAR},
+                                         LogicalType::VARCHAR, GetDatasetInfo));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_version", {},
+                                         LogicalType::VARCHAR, GetVersion));
+  loader.RegisterFunction(ScalarFunction("gaggle_clear_cache", {},
+                                         LogicalType::BOOLEAN, ClearCache));
+  loader.RegisterFunction(ScalarFunction("gaggle_get_cache_info", {},
+                                         LogicalType::VARCHAR, GetCacheInfo));
 
   // Register replacement scan for "kaggle:" prefix
   // This allows: SELECT * FROM 'kaggle:owner/dataset/file.csv'
@@ -312,7 +355,8 @@ std::string GaggleExtension::Version() const { return "v0.3.0"; }
 } // namespace duckdb
 
 extern "C" {
-DUCKDB_EXTENSION_API void gaggle_duckdb_cpp_init(duckdb::ExtensionLoader &loader) {
+DUCKDB_EXTENSION_API void
+gaggle_duckdb_cpp_init(duckdb::ExtensionLoader &loader) {
   duckdb::LoadInternal(loader);
 }
 

@@ -2,13 +2,13 @@
 
 The table below includes the information about all SQL functions exposed by Gaggle.
 
-| #  | Function                                                     | Return Type      | Description                                                                                                                                               |
-|----|:-------------------------------------------------------------|:-----------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | `gaggle_set_credentials(username VARCHAR, key VARCHAR)`      | `BOOLEAN`        | Sets Kaggle API credentials for the session. Returns `true` on success.                                                                                   |
-| 2  | `gaggle_search_datasets(query VARCHAR)`                      | `VARCHAR (JSON)` | Searches Kaggle for datasets matching the query and returns results as JSON.                                                                              |
-| 3  | `gaggle_get_dataset_files(dataset_path VARCHAR)`             | `VARCHAR (JSON)` | Lists all files in a Kaggle dataset (format: 'owner/dataset-name').                                                                                      |
-| 4  | `gaggle_download_dataset(dataset_path VARCHAR)`              | `VARCHAR`        | Downloads a Kaggle dataset and returns the local cache directory path.                                                                                    |
-| 5  | `gaggle_get_dataset_metadata(dataset_path VARCHAR)`          | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info.                                                                       |
+| # | Function                                                | Return Type      | Description                                                                         |
+|---|:--------------------------------------------------------|:-----------------|:------------------------------------------------------------------------------------|
+| 1 | `gaggle_set_credentials(username VARCHAR, key VARCHAR)` | `BOOLEAN`        | Sets Kaggle API credentials for the session. Returns `true` on success.             |
+| 2 | `gaggle_search_datasets(query VARCHAR)`                 | `VARCHAR (JSON)` | Searches Kaggle for datasets matching the query and returns results as JSON.        |
+| 3 | `gaggle_get_dataset_files(dataset_path VARCHAR)`        | `VARCHAR (JSON)` | Lists all files in a Kaggle dataset (format: 'owner/dataset-name').                 |
+| 4 | `gaggle_download_dataset(dataset_path VARCHAR)`         | `VARCHAR`        | Downloads a Kaggle dataset and returns the local cache directory path.              |
+| 5 | `gaggle_get_dataset_metadata(dataset_path VARCHAR)`     | `VARCHAR (JSON)` | Returns metadata for a Kaggle dataset including size, description, and update info. |
 
 > [!NOTE]
 > Kaggle credentials can be provided via environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`),
@@ -54,22 +54,23 @@ select gaggle_download_dataset('username/dataset-name');
 -- Returns local directory path
 
 -- Read a CSV file from a Kaggle dataset
-select * from read_csv('~/.gaggle_cache/datasets/username/dataset-name/file.csv');
+select *
+from read_csv('~/.gaggle_cache/datasets/username/dataset-name/file.csv');
 ```
 
 #### Integration with DuckDB
 
 ```sql
 -- Load the extension
-LOAD 'build/release/extension/gaggle/gaggle.duckdb_extension';
+LOAD
+'build/release/extension/gaggle/gaggle.duckdb_extension';
 
 -- Search for a dataset
 select gaggle_search_datasets('iris');
 
 -- Download and read the dataset
-select * from read_csv((
-  select gaggle_download_dataset('uciml/iris') || '/iris.csv'
-));
+select *
+from read_csv((select gaggle_download_dataset('uciml/iris') || '/iris.csv'));
 ```
 
 ---

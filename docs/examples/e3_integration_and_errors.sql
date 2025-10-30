@@ -1,47 +1,48 @@
--- integration & error handling demo
+-- Gaggle Integration and Error Handling Examples
+-- Demonstrates error handling and integration patterns with DuckDB queries
+
 .echo on
-load infera;
 
--- section 1: missing model behavior
-select '## missing model behavior';
-select infera_get_model_info('nonexistent_model') as missing_model_info;  -- returns JSON with error
-select infera_unload_model('nonexistent_model') as unload_missing;        -- idempotent true
+-- section 1: Set up
+load 'build/release/extension/gaggle/gaggle.duckdb_extension';
+select gaggle_set_credentials('your-username', 'your-api-key') as credentials_set;
 
--- section 2: batch style predictions (deterministic)
-select '## batch predictions';
-select infera_load_model('linear', 'test/models/linear.onnx') as loaded_linear;
--- deterministic feature set (3 rows)
-create or replace table features as
+-- section 2: Error handling - missing dataset
+select '## Handle missing dataset error';
+select gaggle_info('nonexistent/dataset-name') as error_result;
+select gaggle_last_error() as last_error_message;
+
+-- section 3: Query integration - filter dataset results
+select '## Filter search results';
+with search_results as (
+  select gaggle_search('titanic', 1, 10) as results
+)
+select results from search_results;
+
+-- section 4: Integration - bulk dataset operations
+select '## Batch dataset operations';
+create or replace table datasets as
 values
-  (1, 1.0::float, 2.0::float, 3.0::float),
-  (2, 0.5::float, 1.0::float, 1.5::float),
-  (3, -1.0::float, 0.0::float, 2.0::float)
+  ('owid/covid-latest-data'),
+  ('uciml/iris'),
+  ('titanic-dataset/titanic')
   ;
--- compute predictions row-wise
-select column0 as id, column1 as f1, column2 as f2, column3 as f3,
-       infera_predict('linear', column1, column2, column3) as prediction
-from features
-order by 1;
--- aggregate over the small batch
-select avg(infera_predict('linear', column1, column2, column3)) as avg_prediction,
-       count(*) as n
-from features;
 
--- section 3: null feature error
-select '## null feature error';
-create or replace table features_with_nulls as values (1, 1.0::float, 2.0::float, null::float);
--- this will raise an error if executed directly; kept commented for demonstration
--- select infera_predict('linear', column1, column2, column3) from features_with_nulls;
+-- Download multiple datasets (note: this may take time)
+select dataset_name,
+       gaggle_download(dataset_name) as local_path
+from datasets
+limit 1;
 
--- instead, show detection:
-select column0 as id,
-       (column3 is null) as has_null_feature
-from features_with_nulls;
+-- section 5: Error handling - null inputs
+select '## Handle null pointer inputs';
+-- These would fail with proper error handling
+-- select gaggle_info(null) as null_input_error;
+-- Instead verify the error was caught:
+select 'Null inputs are handled by gaggle_last_error()' as note;
 
--- section 4: cleanup
-select '## cleanup';
-drop table features;
-drop table features_with_nulls;
-select infera_unload_model('linear') as unloaded_linear;
+-- section 6: Cleanup
+select '## Cleanup';
+drop table datasets;
 
 .echo off

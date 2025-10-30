@@ -1,70 +1,90 @@
 ## Feature Roadmap
 
-This document includes the roadmap for the Infera DuckDB extension.
+This document includes the roadmap for the Gaggle DuckDB extension.
 It outlines features to be implemented and their current status.
 
 > [!IMPORTANT]
 > This roadmap is a work in progress and is subject to change.
 
-### 1. Inference Interface
+### 1. Kaggle API Integration
 
-* **Input Data Types**
-    * [x] `FLOAT` features from table columns.
-    * [x] Type casting from `INTEGER`, `BIGINT`, and `DOUBLE` columns.
-    * [x] Type casting from `DECIMAL` columns.
-    * [x] `BLOB` input for tensor data.
-    * [ ] `STRUCT` or `MAP` input for named features.
-* **Output Data Types**
-    * [x] Single `FLOAT` scalar output.
-    * [x] Multiple `FLOAT` outputs as a `VARCHAR` containing JSON.
-    * [x] Multiple `FLOAT` outputs as a `LIST[FLOAT]`.
-* **Batch Processing**
-    * [x] Inference on batches for models with dynamic dimensions.
-    * [ ] Automatic batch splitting for models with a fixed batch size.
+* **Authentication**
+    * [x] Set Kaggle API credentials programmatically.
+    * [x] Support environment variables (using `KAGGLE_USERNAME` and `KAGGLE_KEY`).
+    * [x] Support `~/.kaggle/kaggle.json file`.
+* **Dataset Operations**
+    * [x] Search for datasets.
+    * [x] Download datasets from Kaggle.
+    * [x] List files in a dataset.
+    * [x] Get dataset metadata.
+    * [ ] Upload datasets to Kaggle.
+    * [ ] Delete datasets from Kaggle.
 
-### 2. Model Management API
+### 2. Caching and Storage
 
-* **Model Loading**
-    * [x] Load models from local file paths.
-    * [x] Load models from URLs with local caching.
-    * [x] Load all `.onnx` models from a directory.
-* **Model Lifecycle**
-    * [x] Unload models from memory.
-    * [x] List loaded models.
-    * [x] Get model metadata as a JSON object.
-    * [x] Check if a model is currently loaded.
-    * [x] Cache eviction policies for remote models.
+* **Cache Management**
+    * [x] Automatic caching of downloaded datasets.
+    * [x] Clear cache functionality.
+    * [x] Get cache information (size and storage location).
+    * [ ] Set cache size limit.
+    * [ ] Cache expiration policies.
+    * [ ] Support for partial file downloads and resumes.
+* **Storage**
+    * [x] Store datasets in configurable directory.
+    * [ ] Support for cloud storage backends (S3, GCS, and Azure).
 
-### 3. Performance and Concurrency
+### 3. Data Integration
+
+* **File Format Support**
+    * [x] CSV/TSV file reading integration.
+    * [x] JSON file reading.
+    * [x] Parquet file reading.
+    * [x] Excel and XLSX file reading.
+* **Direct Query Integration**
+    * [ ] Direct SQL queries on remote datasets without full download.
+    * [ ] Streaming data from Kaggle without caching.
+    * [ ] Virtual table support for lazy loading.
+
+### 4. Performance and Concurrency
 
 * **Concurrency Control**
-    * [x] Thread-safe model store for concurrent queries.
-* **Data Transfer**
-    * [ ] Process `BLOB` columns in a single FFI call.
-    * [ ] Zero-copy data transfer between DuckDB and Rust.
-* **Hardware Support**
-    * [ ] GPU support for inference via an alternative backend.
+    * [x] Thread-safe credential storage.
+    * [x] Thread-safe cache access.
+    * [ ] Concurrent dataset downloads.
+* **Network Optimization**
+    * [x] Configurable HTTP timeouts.
+    * [ ] Connection pooling for Kaggle API requests.
+    * [ ] Retry logic with exponential backoff.
+* **Caching Strategy**
+    * [ ] Incremental cache updates.
+    * [ ] Background cache synchronization.
 
-### 4. Backend and Format Support
+### 5. Error Handling and Resilience
 
-* **ONNX Standard**
-    * [x] Support for ONNX operators via the `tract` engine.
-    * [ ] Support for models with named inputs and outputs.
-* **Alternative Backends**
-    * [ ] An optional build using the ONNX Runtime backend.
-* **Other Formats**
-    * [ ] Support for other model formats like TorchScript or TensorFlow Lite.
+* **Error Messages**
+    * [x] Clear error messages for invalid credentials.
+    * [x] Clear error messages for missing datasets.
+    * [x] Clear error messages for `NULL` inputs.
+    * [ ] Detailed error codes for programmatic error handling.
+* **Resilience**
+    * [ ] Automatic retry on network failures.
+    * [ ] Graceful degradation when Kaggle API is unavailable.
+    * [ ] Local-only mode for cached datasets.
 
-### 5. Miscellaneous
+### 6. Documentation and Distribution
 
-* **SQL Functions**
-    * [x] Consistent function names for the public API.
-* **Error Handling**
-    * [x] Error messages for missing models, incorrect argument counts, and NULL inputs.
-    * [ ] Error messages with more specific details.
 * **Documentation**
-    * [x] `README.md` file with API reference and examples.
-    * [ ] An official DuckDB extension documentation page.
+    * [x] API reference in README.md.
+    * [x] Usage examples (see  `docs/examples/`).
+    * [ ] Tutorial documentation.
+    * [ ] FAQ section.
+    * [ ] Troubleshooting guide.
+* **Testing**
+    * [x] Unit tests for all modules.
+    * [x] SQL integration tests.
+    * [ ] End-to-end integration tests.
+    * [ ] Performance benchmarks.
 * **Distribution**
     * [ ] Pre-compiled extension binaries for Linux, macOS, and Windows.
     * [ ] Submission to the DuckDB Community Extensions repository.
+    * [ ] Docker image with Gaggle pre-installed.

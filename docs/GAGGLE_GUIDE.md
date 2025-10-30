@@ -2,7 +2,8 @@
 
 ## Overview
 
-Gaggle is a DuckDB extension that provides seamless integration with Kaggle datasets. This guide covers installation, configuration, and usage.
+Gaggle is a DuckDB extension that provides seamless integration with Kaggle datasets. This guide covers installation,
+configuration, and usage.
 
 ## Installation
 
@@ -55,6 +56,7 @@ Create `~/.kaggle/kaggle.json`:
 ```
 
 Make sure to set proper permissions:
+
 ```bash
 chmod 600 ~/.kaggle/kaggle.json
 ```
@@ -76,13 +78,13 @@ SELECT gaggle_set_credentials('your-username', 'your-api-key');
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `KAGGLE_USERNAME` | Your Kaggle username | None (required) |
-| `KAGGLE_KEY` | Your Kaggle API key | None (required) |
-| `GAGGLE_CACHE_DIR` | Directory for caching downloaded datasets | System cache directory + `/gaggle_cache` |
-| `GAGGLE_VERBOSE` | Enable verbose logging | `false` |
-| `GAGGLE_HTTP_TIMEOUT` | HTTP request timeout in seconds | `30` |
+| Variable              | Description                               | Default                                  |
+|-----------------------|-------------------------------------------|------------------------------------------|
+| `KAGGLE_USERNAME`     | Your Kaggle username                      | None (required)                          |
+| `KAGGLE_KEY`          | Your Kaggle API key                       | None (required)                          |
+| `GAGGLE_CACHE_DIR`    | Directory for caching downloaded datasets | System cache directory + `/gaggle_cache` |
+| `GAGGLE_VERBOSE`      | Enable verbose logging                    | `false`                                  |
+| `GAGGLE_HTTP_TIMEOUT` | HTTP request timeout in seconds           | `30`                                     |
 
 ## Usage
 
@@ -93,6 +95,7 @@ LOAD 'build/release/extension/gaggle/gaggle.duckdb_extension';
 ```
 
 Or if installed:
+
 ```sql
 LOAD gaggle;
 ```
@@ -249,11 +252,13 @@ JOIN data2 d2 ON d1.id = d2.id;
 ### Error: "Failed to download dataset: HTTP 403"
 
 **Possible causes:**
+
 - Invalid credentials
 - Dataset requires acceptance of competition rules
 - Rate limit exceeded
 
 **Solution:**
+
 - Verify your credentials
 - Accept dataset terms on Kaggle website
 - Wait a few minutes before retrying
@@ -261,6 +266,7 @@ JOIN data2 d2 ON d1.id = d2.id;
 ### Error: "Dataset not found"
 
 **Solution:**
+
 - Verify the dataset path format: `owner/dataset-name`
 - Check if the dataset exists on Kaggle
 - Ensure you have access rights to the dataset

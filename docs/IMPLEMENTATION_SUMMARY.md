@@ -2,19 +2,22 @@
 
 ## Overview
 
-Successfully transformed the Gaggle extension from an ML inference tool (Infera) to a Kaggle dataset integration extension for DuckDB.
+Successfully transformed the Gaggle extension from an ML inference tool (Infera) to a Kaggle dataset integration
+extension for DuckDB.
 
 ## What Was Changed
 
 ### 1. Core Functionality Replaced
 
 **Old (Infera):**
+
 - ML model loading and inference
 - ONNX model support
 - Tensor operations
 - Tract backend
 
 **New (Gaggle):**
+
 - Kaggle API integration
 - Dataset download and caching
 - Dataset search and discovery
@@ -23,11 +26,13 @@ Successfully transformed the Gaggle extension from an ML inference tool (Infera)
 ### 2. Dependencies Updated
 
 **Removed:**
+
 - `tract-onnx` - ML inference engine
 - `ndarray` - Array processing
 - `sha2`, `hex`, `filetime` - Model cache management
 
 **Added:**
+
 - `zip` - Extract downloaded datasets
 - `csv` - CSV file support
 - `dirs` - Cross-platform directory paths
@@ -38,25 +43,25 @@ Successfully transformed the Gaggle extension from an ML inference tool (Infera)
 
 #### Implemented Functions
 
-| Function | Description | Status |
-|----------|-------------|--------|
-| `gaggle_set_credentials(username, key)` | Set Kaggle API credentials | ✅ Implemented |
-| `gaggle_download(dataset_path)` | Download dataset and return local path | ✅ Implemented |
-| `gaggle_list_files(dataset_path)` | List files in a dataset | ✅ Implemented |
-| `gaggle_search(query, page, page_size)` | Search Kaggle datasets | ✅ Implemented |
-| `gaggle_info(dataset_path)` | Get dataset metadata | ✅ Implemented |
-| `gaggle_get_version()` | Get extension version | ✅ Implemented |
-| `gaggle_clear_cache()` | Clear dataset cache | ✅ Implemented |
-| `gaggle_get_cache_info()` | Get cache statistics | ✅ Implemented |
+| Function                                | Description                            | Status        |
+|-----------------------------------------|----------------------------------------|---------------|
+| `gaggle_set_credentials(username, key)` | Set Kaggle API credentials             | ✅ Implemented |
+| `gaggle_download(dataset_path)`         | Download dataset and return local path | ✅ Implemented |
+| `gaggle_list_files(dataset_path)`       | List files in a dataset                | ✅ Implemented |
+| `gaggle_search(query, page, page_size)` | Search Kaggle datasets                 | ✅ Implemented |
+| `gaggle_info(dataset_path)`             | Get dataset metadata                   | ✅ Implemented |
+| `gaggle_get_version()`                  | Get extension version                  | ✅ Implemented |
+| `gaggle_clear_cache()`                  | Clear dataset cache                    | ✅ Implemented |
+| `gaggle_get_cache_info()`               | Get cache statistics                   | ✅ Implemented |
 
 #### Planned Functions (Future)
 
-| Function | Description | Priority |
-|----------|-------------|----------|
-| `gaggle_upload(table, dataset_path)` | Upload DuckDB table as Kaggle dataset | Medium |
-| `kaggle_read_table(dataset_path, file)` | Table function for direct reading | High |
-| `gaggle_update(dataset_path)` | Update cached dataset | Low |
-| `gaggle_dataset_versions(dataset_path)` | List dataset versions | Low |
+| Function                                | Description                           | Priority |
+|-----------------------------------------|---------------------------------------|----------|
+| `gaggle_upload(table, dataset_path)`    | Upload DuckDB table as Kaggle dataset | Medium   |
+| `kaggle_read_table(dataset_path, file)` | Table function for direct reading     | High     |
+| `gaggle_update(dataset_path)`           | Update cached dataset                 | Low      |
+| `gaggle_dataset_versions(dataset_path)` | List dataset versions                 | Low      |
 
 ### 4. File Structure
 
@@ -211,6 +216,7 @@ cargo test
 ### Integration Tests (SQL)
 
 Test files to create:
+
 - `test/sql/test_credentials.test` - Credential management
 - `test/sql/test_download.test` - Dataset download
 - `test/sql/test_search.test` - Search functionality
@@ -237,18 +243,21 @@ SELECT * FROM read_csv_auto(
 ## Future Enhancements
 
 ### Short Term
+
 - [ ] Add direct table function: `SELECT * FROM kaggle('owner/dataset/file.csv')`
 - [ ] Implement automatic file type detection
 - [ ] Add progress indicators for large downloads
 - [ ] Create comprehensive test suite
 
 ### Medium Term
+
 - [ ] Implement dataset upload functionality
 - [ ] Add support for Kaggle competitions
 - [ ] Implement dataset version management
 - [ ] Add parallel download for large datasets
 
 ### Long Term
+
 - [ ] Integrate with DuckDB's replacement scan for seamless `FROM 'kaggle:...'` syntax
 - [ ] Add streaming support for very large datasets
 - [ ] Implement incremental updates for datasets
@@ -284,6 +293,8 @@ SELECT * FROM read_csv_auto(
 
 ## Conclusion
 
-The Gaggle extension has been successfully redesigned from an ML inference tool to a Kaggle dataset integration extension. The core implementation is complete, with a clean API for downloading, searching, and accessing Kaggle datasets directly from SQL queries.
+The Gaggle extension has been successfully redesigned from an ML inference tool to a Kaggle dataset integration
+extension. The core implementation is complete, with a clean API for downloading, searching, and accessing Kaggle
+datasets directly from SQL queries.
 
 The next phase involves building, testing, and refining the implementation based on real-world usage.

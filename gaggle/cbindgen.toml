@@ -33,20 +33,17 @@ prefix = ""
 # Export settings
 [export]
 include = [
-    "gaggle_set_autoload_dir",
+    "gaggle_set_credentials",
+    "gaggle_download_dataset",
+    "gaggle_get_file_path",
+    "gaggle_list_files",
+    "gaggle_search",
+    "gaggle_get_dataset_info",
     "gaggle_get_version",
-    "gaggle_load_model",
-    "gaggle_unload_model",
-    "gaggle_predict",
-    "gaggle_predict_from_blob",
-    "gaggle_get_model_info",
-    "gaggle_get_loaded_models",
+    "gaggle_free",
     "gaggle_clear_cache",
     "gaggle_get_cache_info",
-    "gaggle_last_error",
-    "gaggle_free",
-    "gaggle_free_result",
-    "GaggleInferenceResult"
+    "gaggle_last_error"
 ]
 
 # Type mappings
@@ -63,4 +60,3 @@ bitflags = true
 "target_os = linux" = "GAGGLE_LINUX"
 "target_os = windows" = "GAGGLE_WINDOWS"
 "target_os = macos" = "GAGGLE_MACOS"
-"feature = tract" = "GAGGLE_TRACT_ENABLED"
