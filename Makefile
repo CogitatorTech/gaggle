@@ -51,7 +51,7 @@ rust-format: ## Format Rust files
 .PHONY: rust-test
 rust-test: rust-format ## Run tests
 	@echo "Running the unit tests for Gaggle..."
-	@cargo test --manifest-path gaggle/Cargo.toml --all-targets --features "expose_internal" -- --nocapture
+	@cargo test --manifest-path gaggle/Cargo.toml --all-targets -- --nocapture
 
 .PHONY: rust-coverage
 rust-coverage: ## Generate code coverage report for Gaggle crate
@@ -151,8 +151,3 @@ examples: ## Run SQL examples for Gaggle extension
 		./build/release/duckdb < $$sql_file; \
 		echo "============================================================================"; \
 	done
-
-.PHONY: itest
-itest: release ## Run Python integration test against built DuckDB shell
-	@echo "Running integration tests..."
-	@uv run -q python3 test/integration/test_duckdb_integration.py

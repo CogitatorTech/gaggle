@@ -1,10 +1,7 @@
-// Security and validation tests
-
 use gaggle::parse_dataset_path;
 
 #[test]
 fn test_path_traversal_attempts_rejected() {
-    // Various path traversal attempts
     let attacks = vec![
         "../../../etc/passwd",
         "owner/../dataset",
@@ -17,7 +14,6 @@ fn test_path_traversal_attempts_rejected() {
 
     for attack in attacks {
         let result = parse_dataset_path(attack);
-        // These should either fail or not contain ".."
         if let Ok((owner, dataset)) = result {
             assert!(!owner.contains(".."));
             assert!(!dataset.contains(".."));
@@ -27,17 +23,15 @@ fn test_path_traversal_attempts_rejected() {
 
 #[test]
 fn test_null_byte_injection_rejected() {
-    // Rust CString will fail on null bytes naturally, but verify
     use std::ffi::CString;
 
     let attempt = "owner/dataset\0malicious";
     let result = CString::new(attempt);
-    assert!(result.is_err()); // Should fail to create CString
+    assert!(result.is_err());
 }
 
 #[test]
 fn test_special_characters_in_dataset_path() {
-    // Test various special characters that should be handled
     let paths = vec![
         ("owner-name", "dataset-name"),
         ("owner_name", "dataset_name"),
@@ -57,7 +51,6 @@ fn test_special_characters_in_dataset_path() {
 
 #[test]
 fn test_overly_long_dataset_paths() {
-    // Test extremely long paths
     let long_owner = "a".repeat(1000);
     let long_dataset = "b".repeat(1000);
     let path = format!("{}/{}", long_owner, long_dataset);
@@ -71,7 +64,6 @@ fn test_overly_long_dataset_paths() {
 
 #[test]
 fn test_unicode_dataset_paths() {
-    // Test Unicode characters in paths
     let paths = vec![
         ("用户", "数据集"),
         ("użytkownik", "zbiór"),
@@ -91,7 +83,6 @@ fn test_unicode_dataset_paths() {
 
 #[test]
 fn test_dataset_path_with_control_characters() {
-    // Test paths with control characters
     let paths_with_control = vec![
         "owner/dataset\n",
         "owner/dataset\r",
@@ -101,16 +92,13 @@ fn test_dataset_path_with_control_characters() {
 
     for path in paths_with_control {
         let result = parse_dataset_path(path);
-        // These should parse but preserve the control characters
         if let Ok((owner, dataset)) = result {
-            // Verify at least they parse into two parts
             assert!(!owner.is_empty() || !dataset.is_empty());
         }
     }
 }
-// Concurrency and thread-safety tests
 
-use gaggle::ffi::{gaggle_free, gaggle_get_cache_info, gaggle_set_credentials};
+use gaggle::{gaggle_free, gaggle_get_cache_info, gaggle_set_credentials};
 use std::ffi::CString;
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -126,7 +114,7 @@ fn test_concurrent_credential_setting() {
             let username = CString::new(format!("user{}", i)).unwrap();
             let key = CString::new(format!("key{}", i)).unwrap();
 
-            b.wait(); // Synchronize start
+            b.wait();
             unsafe {
                 let result = gaggle_set_credentials(username.as_ptr(), key.as_ptr());
                 assert!(result == 0 || result == -1);
@@ -145,18 +133,15 @@ fn test_concurrent_cache_info_access() {
     let mut handles = vec![];
 
     for _ in 0..20 {
-        let handle = thread::spawn(|| {
-            unsafe {
-                let info_ptr = gaggle_get_cache_info();
-                assert!(!info_ptr.is_null());
+        let handle = thread::spawn(|| unsafe {
+            let info_ptr = gaggle_get_cache_info();
+            assert!(!info_ptr.is_null());
 
-                // Verify we can read it
-                let info_cstr = std::ffi::CStr::from_ptr(info_ptr);
-                let info_str = info_cstr.to_str().unwrap();
-                assert!(!info_str.is_empty());
+            let info_cstr = std::ffi::CStr::from_ptr(info_ptr);
+            let info_str = info_cstr.to_str().unwrap();
+            assert!(!info_str.is_empty());
 
-                gaggle_free(info_ptr);
-            }
+            gaggle_free(info_ptr);
         });
         handles.push(handle);
     }
@@ -171,7 +156,6 @@ fn test_credential_setting_with_cache_access() {
     let barrier = Arc::new(Barrier::new(4));
     let mut handles = vec![];
 
-    // Two threads setting credentials
     for i in 0..2 {
         let b = Arc::clone(&barrier);
         let handle = thread::spawn(move || {
@@ -186,7 +170,6 @@ fn test_credential_setting_with_cache_access() {
         handles.push(handle);
     }
 
-    // Two threads reading cache info
     for _ in 0..2 {
         let b = Arc::clone(&barrier);
         let handle = thread::spawn(move || {
@@ -202,5 +185,39 @@ fn test_credential_setting_with_cache_access() {
 
     for handle in handles {
         handle.join().unwrap();
+    }
+}
+
+#[test]
+fn test_get_file_path_rejects_absolute_filename() {
+    unsafe {
+        let u = CString::new("user").unwrap();
+        let k = CString::new("key").unwrap();
+        assert_eq!(gaggle_set_credentials(u.as_ptr(), k.as_ptr()), 0);
+        let ds = CString::new("owner/ds").unwrap();
+        let filename = CString::new("/etc/passwd").unwrap();
+        let ptr = gaggle::gaggle_get_file_path(ds.as_ptr(), filename.as_ptr());
+        assert!(ptr.is_null());
+        let err_ptr = gaggle::gaggle_last_error();
+        assert!(!err_ptr.is_null());
+        let msg = std::ffi::CStr::from_ptr(err_ptr).to_str().unwrap();
+        assert!(msg.to_lowercase().contains("absolute"));
+    }
+}
+
+#[test]
+fn test_get_file_path_rejects_parent_components() {
+    unsafe {
+        let u = CString::new("user").unwrap();
+        let k = CString::new("key").unwrap();
+        assert_eq!(gaggle_set_credentials(u.as_ptr(), k.as_ptr()), 0);
+        let ds = CString::new("owner/ds").unwrap();
+        let filename = CString::new("../secrets.csv").unwrap();
+        let ptr = gaggle::gaggle_get_file_path(ds.as_ptr(), filename.as_ptr());
+        assert!(ptr.is_null());
+        let err_ptr = gaggle::gaggle_last_error();
+        assert!(!err_ptr.is_null());
+        let msg = std::ffi::CStr::from_ptr(err_ptr).to_str().unwrap();
+        assert!(msg.to_lowercase().contains("parent") || msg.to_lowercase().contains("root"));
     }
 }

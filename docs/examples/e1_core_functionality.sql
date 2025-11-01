@@ -1,36 +1,49 @@
 .echo on
 
--- section 1: Load extension and get version
+-- Section 1: load extension and get version
 select '## Load extension and get version';
 load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 select gaggle_version() as version;
 
--- section 2: Set Kaggle credentials
+-- Section 2: set kaggle credentials
 select '## Set Kaggle credentials';
--- Method 1: Set directly (or use KAGGLE_USERNAME/KAGGLE_KEY env vars or ~/.kaggle/kaggle.json)
+-- Method 1: set directly (or use KAGGLE_USERNAME/KAGGLE_KEY env vars or ~/.kaggle/kaggle.json)
 select gaggle_set_credentials('your-username', 'your-api-key') as credentials_set;
 
--- section 3: Search for datasets
+-- Section 3: search for datasets
 select '## Search for datasets';
 select gaggle_search('covid', 1, 5) as search_results;
 
--- section 4: Download a dataset
+-- Section 3b: parse search results (JSON)
+select '## Parse search results (JSON)';
+with search_results as (
+  select from_json(gaggle_search('covid', 1, 10)) as j
+)
+select json_extract_string(value, '$.ref') as ref,
+       json_extract_string(value, '$.title') as title
+from json_each((select j from search_results))
+limit 5;
+
+-- Section 4: download a dataset
 select '## Download a dataset';
 select gaggle_download('owid/covid-latest-data') as download_path;
 
--- section 5: List files in a dataset (JSON)
-select '## List files (JSON)';
-select gaggle_list_files('owid/covid-latest-data') as files_json;
+-- Section 5: list files (JSON)
+select '## list files (json)';
+select to_json(
+         list(struct_pack(name := name, size := size, path := path))
+       ) as files_json
+from gaggle_ls('owid/covid-latest-data');
 
--- section 5b: List files in a dataset (table)
-select '## List files (table)';
+-- Section 5b: list files (table)
+select '## list files (table)';
 select * from gaggle_ls('owid/covid-latest-data') limit 5;
 
--- section 6: Get dataset metadata
-select '## Get dataset metadata';
+-- Section 6: get dataset metadata
+select '## get dataset metadata';
 select gaggle_info('owid/covid-latest-data') as dataset_metadata;
 
--- section 7: Get cache information
+-- Section 7: get cache information
 select '## Get cache information';
 select gaggle_cache_info() as cache_info;
 

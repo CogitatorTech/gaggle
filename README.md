@@ -9,7 +9,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/CogitatorTech/gaggle/tests.yml?label=tests&style=flat&labelColor=282c34&logo=github)](https://github.com/CogitatorTech/gaggle/actions/workflows/tests.yml)
 [![Code Quality](https://img.shields.io/codefactor/grade/github/CogitatorTech/gaggle?label=quality&style=flat&labelColor=282c34&logo=codefactor)](https://www.codefactor.io/repository/github/CogitatorTech/gaggle)
 [![Examples](https://img.shields.io/badge/examples-view-green?style=flat&labelColor=282c34&logo=github)](https://github.com/CogitatorTech/gaggle/tree/main/docs/examples)
-[![Docs](https://img.shields.io/badge/docs-view-blue?style=flat&labelColor=282c34&logo=read-the-docs)](https://github.com/CogitatorTech/gaggle/tree/main/docs)
+[![Docs](https://img.shields.io/badge/docs-read-blue?style=flat&labelColor=282c34&logo=read-the-docs)](https://github.com/CogitatorTech/gaggle/tree/main/docs)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/CogitatorTech/gaggle)
 
 Kaggle Datasets for DuckDB
@@ -18,7 +18,7 @@ Kaggle Datasets for DuckDB
 
 ---
 
-Gaggle is a DuckDB extension that allows you to read and write Kaggle datasets directly in SQL queries, as if
+Gaggle is a DuckDB extension that allows you to work with Kaggle datasets directly in SQL queries, as if
 they were DuckDB tables.
 It is written in Rust and uses the official Kaggle API to search, download, and manage datasets.
 
@@ -26,11 +26,12 @@ Kaggle hosts a large collection of very useful datasets for data science and mac
 Accessing these datasets typically involves multiple steps including manually downloading a dataset (as a ZIP file),
 extracting it, loading the files in the dataset into your data science environment, and managing storage and dataset
 updates, etc.
-This workflow can be simplified and optimized by bringing the datasets directly into DuckDB.
+This workflow can be a at time.
+Gaggle tries to help simplify this process by integrating Kaggle dataset access directly into DuckDB.
 
 ### Features
 
-- Has a simple API (just a few SQL functions)
+- Has a simple API (just a handful of SQL functions)
 - Allows you search, download, update, and delete Kaggle datasets directly from DuckDB
 - Supports datasets made of CSV, JSON, and Parquet files
 - Configurable and has built-in caching support

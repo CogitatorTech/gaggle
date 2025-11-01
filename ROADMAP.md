@@ -10,15 +10,14 @@ It outlines features to be implemented and their current status.
 
 * **Authentication**
     * [x] Set Kaggle API credentials programmatically.
-    * [x] Support environment variables (using `KAGGLE_USERNAME` and `KAGGLE_KEY`).
-    * [x] Support `~/.kaggle/kaggle.json file`.
+    * [x] Support environment variables for authentication (`KAGGLE_USERNAME` and `KAGGLE_KEY`).
+    * [x] Support reading credentials from `~/.kaggle/kaggle.json file`.
 * **Dataset Operations**
-    * [x] Search for datasets.
+    * [x] Search for datasets on Kaggle.
     * [x] Download datasets from Kaggle.
     * [x] List files in a dataset.
     * [x] Get dataset metadata.
-    * [ ] Upload datasets to Kaggle.
-    * [ ] Delete datasets from Kaggle.
+    * [ ] Upload DuckDB tables to Kaggle.
 
 ### 2. Caching and Storage
 
@@ -28,7 +27,6 @@ It outlines features to be implemented and their current status.
     * [x] Get cache information (size and storage location).
     * [ ] Set cache size limit.
     * [ ] Cache expiration policies.
-    * [ ] Support for partial file downloads and resumes.
 * **Storage**
     * [x] Store datasets in configurable directory.
     * [ ] Support for cloud storage backends (S3, GCS, and Azure).
@@ -37,13 +35,11 @@ It outlines features to be implemented and their current status.
 
 * **File Format Support**
     * [x] CSV and TSV file reading.
-    * [x] JSON file reading.
     * [x] Parquet file reading.
+    * [x] JSON file reading.
     * [ ] Excel and XLSX file reading.
-* **Direct Query Integration**
+* **Querying Datasets**
     * [x] Replacement scan for `kaggle:` URLs.
-    * [ ] Direct SQL queries on remote datasets without full download (true streaming).
-    * [ ] Streaming data from Kaggle without caching.
     * [ ] Virtual table support for lazy loading.
 
 ### 4. Performance and Concurrency
@@ -51,10 +47,10 @@ It outlines features to be implemented and their current status.
 * **Concurrency Control**
     * [x] Thread-safe credential storage.
     * [x] Thread-safe cache access.
-    * [ ] Concurrent dataset downloads.
+    * [x] Concurrent dataset downloads (with per-dataset serialization to prevent race conditions).
 * **Network Optimization**
     * [x] Configurable HTTP timeouts.
-    * [ ] Retry logic with backoff (configurable attempts/delay; planned).
+    * [x] Retry logic with backoff for failed requests.
 * **Caching Strategy**
     * [ ] Incremental cache updates.
     * [ ] Background cache synchronization.
@@ -67,7 +63,7 @@ It outlines features to be implemented and their current status.
     * [x] Clear error messages for `NULL` inputs.
     * [ ] Detailed error codes for programmatic error handling.
 * **Resilience**
-    * [ ] Automatic retry on network failures (planned with backoff settings).
+    * [x] Automatic retry on network failures.
     * [ ] Graceful degradation when Kaggle API is unavailable.
     * [ ] Local-only mode for cached datasets.
 
@@ -87,4 +83,3 @@ It outlines features to be implemented and their current status.
 * **Distribution**
     * [ ] Pre-compiled extension binaries for Linux, macOS, and Windows.
     * [ ] Submission to the DuckDB Community Extensions repository.
-    * [ ] Docker image with Gaggle pre-installed.

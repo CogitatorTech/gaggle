@@ -54,6 +54,23 @@ Gaggle supports configuration via environment variables to customize its behavio
   export GAGGLE_API_BASE=http://127.0.0.1:12345
   ```
 
+##### HTTP Retry Controls
+
+- **GAGGLE_HTTP_RETRY_ATTEMPTS**
+  - **Description**: Number of retry attempts after the initial try
+  - **Type**: Integer
+  - **Default**: `3`
+- **GAGGLE_HTTP_RETRY_DELAY_MS**
+  - **Description**: Initial backoff delay in milliseconds
+  - **Type**: Integer (ms)
+  - **Default**: `1000`
+- **GAGGLE_HTTP_RETRY_MAX_DELAY_MS**
+  - **Description**: Maximum backoff delay cap in milliseconds
+  - **Type**: Integer (ms)
+  - **Default**: `30000`
+
+  These controls enable exponential backoff with cap across metadata/search/download requests.
+
 #### Logging Configuration
 
 ##### GAGGLE_VERBOSE
@@ -116,8 +133,9 @@ export GAGGLE_CACHE_SIZE_LIMIT=53687091200
 export GAGGLE_CACHE_DIR="/var/lib/gaggle/cache"
 export GAGGLE_CACHE_SIZE_LIMIT=53687091200  ## 50GB (planned)
 export GAGGLE_HTTP_TIMEOUT=120              ## 2 minutes
-export GAGGLE_HTTP_RETRY_ATTEMPTS=5         ## Retry up to 5 times (planned)
-export GAGGLE_HTTP_RETRY_DELAY=2000         ## 2 second initial delay (planned)
+export GAGGLE_HTTP_RETRY_ATTEMPTS=5         ## Retry up to 5 times
+export GAGGLE_HTTP_RETRY_DELAY_MS=2000      ## 2 second initial delay
+export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=30000 ## Cap backoff at 30s
 export GAGGLE_LOG_LEVEL=WARN                ## Production logging (planned)
 
 ## Set Kaggle credentials
@@ -135,19 +153,21 @@ export KAGGLE_KEY="your-api-key"
 export GAGGLE_CACHE_DIR="./dev-cache"
 export GAGGLE_LOG_LEVEL=DEBUG               ## Detailed debug logs (planned)
 export GAGGLE_HTTP_TIMEOUT=10               ## Shorter timeout for dev
-export GAGGLE_HTTP_RETRY_ATTEMPTS=1         ## Fail fast in development (planned)
+export GAGGLE_HTTP_RETRY_ATTEMPTS=1         ## Fail fast in development
+export GAGGLE_HTTP_RETRY_DELAY_MS=250       ## Quick retry
 
 ## Run DuckDB
 ./build/release/duckdb
 ```
 
-#### Example 5: Slow Network Configuration (partially planned)
+#### Example 5: Slow Network Configuration
 
 ```bash
 ## Configuration for slow or unreliable networks
 export GAGGLE_HTTP_TIMEOUT=300              ## 5 minute timeout
-export GAGGLE_HTTP_RETRY_ATTEMPTS=10        ## Many retries (planned)
-export GAGGLE_HTTP_RETRY_DELAY=5000         ## 5 second initial delay (planned)
+export GAGGLE_HTTP_RETRY_ATTEMPTS=10        ## Many retries
+export GAGGLE_HTTP_RETRY_DELAY_MS=5000      ## 5 second initial delay
+export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=60000 ## Cap at 60s
 
 ./build/release/duckdb
 ```
@@ -164,10 +184,10 @@ SELECT gaggle_search('housing', 1, 10);
 SELECT gaggle_info('username/dataset-name');
 ```
 
-### Retry Policy Details (planned)
+### Retry Policy Details
 
-Retry policy and exponential backoff are planned but not yet implemented. Current releases do not retry failed HTTP
-requests automatically.
+Gaggle implements retries with exponential backoff for HTTP requests. The number of attempts, initial delay, and
+maximum delay can be tuned with the environment variables above.
 
 ### Logging Levels (planned)
 

@@ -1,11 +1,8 @@
-// Contains the GaggleError enum and thread-local error handling logic.
-
 use std::cell::RefCell;
 use std::ffi::{c_char, CString};
 use std::str::Utf8Error as StdUtf8Error;
 use thiserror::Error;
 
-/// Represents all possible errors that can occur within the Gaggle library.
 #[derive(Error, Debug)]
 #[allow(dead_code)]
 pub enum GaggleError {

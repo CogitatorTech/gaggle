@@ -10,7 +10,6 @@ crate-type = ["rlib", "staticlib", "cdylib"]
 
 [features]
 duckdb_extension = []
-expose_internal = []
 default = []
 
 [dependencies]

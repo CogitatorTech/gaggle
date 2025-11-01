@@ -7,8 +7,7 @@ These tests are different than other tests like Rust tests in [gaggle](../gaggle
 
 - Rust (nightly version).
 - GNU Make, CMake, and a C++ compiler.
-- Python 3.10+ (only needed for Python and concurrency tests).
-- Network access (for downloading ONNX models in some tests).
+- Python 3.10+ (optional; only needed for test written in Python).
 
 ### Building Gaggle
 

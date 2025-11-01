@@ -1,0 +1,116 @@
+use crate::error::GaggleError;
+use serde::{Deserialize, Serialize};
+
+use super::api::{build_client, get_api_base, with_retries};
+use super::credentials::get_credentials;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct DatasetInfo {
+    pub ref_path: String,
+    pub title: String,
+    pub size: u64,
+    pub url: String,
+    pub last_updated: String,
+}
+
+/// Get metadata for a specific dataset
+pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, GaggleError> {
+    let creds = get_credentials()?;
+    let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+
+    let url = format!("{}/datasets/view/{}/{}", get_api_base(), owner, dataset);
+
+    let client = build_client()?;
+    let response = with_retries(|| {
+        client
+            .get(&url)
+            .basic_auth(&creds.username, Some(&creds.key))
+            .send()
+            .map_err(|e| GaggleError::HttpRequestError(e.to_string()))
+    })?;
+
+    if !response.status().is_success() {
+        return Err(GaggleError::HttpRequestError(format!(
+            "Failed to get dataset metadata: HTTP {}",
+            response.status()
+        )));
+    }
+
+    let json: serde_json::Value = response.json()?;
+    Ok(json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dataset_info_struct() {
+        let info = DatasetInfo {
+            ref_path: "owner/dataset".to_string(),
+            title: "Test Dataset".to_string(),
+            size: 1024000,
+            url: "https://kaggle.com/datasets/owner/dataset".to_string(),
+            last_updated: "2024-01-01".to_string(),
+        };
+
+        assert_eq!(info.ref_path, "owner/dataset");
+        assert_eq!(info.title, "Test Dataset");
+        assert_eq!(info.size, 1024000);
+    }
+
+    #[test]
+    fn test_dataset_info_serialization() {
+        let info = DatasetInfo {
+            ref_path: "owner/dataset".to_string(),
+            title: "Test".to_string(),
+            size: 1000,
+            url: "https://test.com".to_string(),
+            last_updated: "2024-01-01".to_string(),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("owner/dataset"));
+        assert!(json.contains("Test"));
+
+        let deserialized: DatasetInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.ref_path, info.ref_path);
+        assert_eq!(deserialized.size, info.size);
+    }
+
+    #[test]
+    fn test_get_dataset_metadata_invalid_path() {
+        std::env::set_var("KAGGLE_USERNAME", "test");
+        std::env::set_var("KAGGLE_KEY", "test");
+
+        // Invalid path format should be caught by parse_dataset_path
+        let result = get_dataset_metadata("invalid");
+        assert!(result.is_err());
+
+        std::env::remove_var("KAGGLE_USERNAME");
+        std::env::remove_var("KAGGLE_KEY");
+    }
+
+    #[test]
+    fn test_get_dataset_metadata_valid_path_format() {
+        std::env::set_var("KAGGLE_USERNAME", "test");
+        std::env::set_var("KAGGLE_KEY", "test");
+
+        // Valid path format, but will fail at HTTP level
+        let result = get_dataset_metadata("owner/dataset");
+        assert!(result.is_err());
+        // Should be HTTP error, not path parsing error
+        if let Err(e) = result {
+            match e {
+                GaggleError::InvalidDatasetPath(_) => {
+                    panic!("Should not have path validation error")
+                }
+                _ => {} // HTTP or credentials error expected
+            }
+        }
+
+        std::env::remove_var("KAGGLE_USERNAME");
+        std::env::remove_var("KAGGLE_KEY");
+    }
+}
