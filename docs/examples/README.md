@@ -23,3 +23,7 @@ Each file is self‑contained and can be executed in the DuckDB shell (or via `d
 ```bash
 make examples
 ```
+
+> [!NOTE]
+> Some operations (like search and download) need network access unless `GAGGLE_OFFLINE=1`.
+> When offline, these will fail fast if data is not cached locally (not downloaded already).

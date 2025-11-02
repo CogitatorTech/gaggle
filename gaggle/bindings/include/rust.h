@@ -45,6 +45,11 @@ extern "C" {
  void gaggle_clear_last_error(void);
 
 /**
+ * Initialize logging for the Rust core based on GAGGLE_LOG_LEVEL
+ */
+ void gaggle_init_logging(void);
+
+/**
  * Set Kaggle API credentials
  *
  * # Arguments

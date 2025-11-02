@@ -1,6 +1,11 @@
+// Regression tests for bugs fixed in Gaggle
+// These tests make sure previously fixed bugs don't reoccur
+
 use gaggle::{gaggle_clear_last_error, gaggle_last_error};
 use gaggle::{gaggle_download_dataset, gaggle_free, gaggle_set_credentials};
 use std::ffi::{CStr, CString};
+use std::fs;
+use std::io::Write;
 use std::sync::{Arc, Barrier};
 use std::thread;
 

@@ -55,12 +55,12 @@ select '## Version pinning: download specific versions';
 -- Section 7: Smart download pattern
 select '## Smart download: only update if outdated';
 -- This pattern checks version and only downloads if needed
-select CASE
-    WHEN gaggle_is_current('uciml/iris') THEN
+select case
+    when gaggle_is_current('uciml/iris') then
         (select 'Using cached version: ' || gaggle_download('uciml/iris'))
-    ELSE
+    else
         (select 'Updating to latest: ' || gaggle_update_dataset('uciml/iris'))
-END as status;
+end as status;
 
 -- Section 8: Version audit across multiple datasets
 select '## Version audit for multiple datasets';
@@ -71,7 +71,7 @@ select
     json_extract_string(gaggle_version_info('uciml/iris'), '$.latest_version') as latest,
     json_extract_string(gaggle_version_info('uciml/iris'), '$.is_current') as current
 -- Add more datasets as needed:
--- UNION ALL
+-- union all
 -- select
 --     'owner/dataset2' as dataset,
 --     json_extract_string(gaggle_version_info('owner/dataset2'), '$.cached_version') as cached,
@@ -86,10 +86,10 @@ with validation as (
     select gaggle_is_current('uciml/iris') as is_current
 )
 select
-    CASE
-        WHEN is_current THEN 'Cache is current, proceeding with query'
-        ELSE 'Cache outdated, would update (commented out for safety)'
-    END as validation_status
+    case
+        when is_current then 'Cache is current, proceeding with query'
+        else 'Cache outdated, would update (commented out for safety)'
+    end as validation_status
 from validation;
 
 -- Step 2: Query data (knowing we have the right version)

@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-read-blue?style=flat&labelColor=282c34&logo=read-the-docs)](https://github.com/CogitatorTech/gaggle/tree/main/docs)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/CogitatorTech/gaggle)
 
-Kaggle Datasets for DuckDB
+Access and Query Kaggle Datasets from DuckDB
 
 </div>
 
@@ -20,13 +20,13 @@ Kaggle Datasets for DuckDB
 
 Gaggle is a DuckDB extension that allows you to work with Kaggle datasets directly in SQL queries, as if
 they were DuckDB tables.
-It is written in Rust and uses the Kaggle API to search, download, and manage datasets.
+It is written in Rust and uses the Kaggle API to search, download, and manage the datasets.
 
 Kaggle hosts a large collection of very useful datasets for data science and machine learning.
 Accessing these datasets typically involves manually downloading a dataset (as a ZIP file),
 extracting it, loading the files in the dataset into your data science environment, and managing storage and dataset
 updates, etc.
-This workflow can be become complex, especially when working with multiple datasets or when datasets are updated
+This workflow can quickly become complex, especially when working with multiple datasets or when datasets are updated
 frequently.
 Gaggle tries to help simplify this process by hiding the complexity and letting you work with datasets directly inside
 an analytical database like DuckDB that can handle fast queries.
@@ -34,14 +34,14 @@ In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 
 ### Features
 
-- Has a simple API to interact with Kaggle datasets from DuckDB
+- Provides a simple API to interact with Kaggle datasets from DuckDB
 - Allows you to search, download, and read datasets from Kaggle
-- Supports datasets that contain CSV, Parquet, JSON, and XLSX files (XLSX requires DuckDB's Excel reader to be available in your DuckDB build)
-- Configurable and has built-in caching support
+- Supports datasets that contain CSV, Parquet, JSON, and XLSX files
+- Configurable and has built-in caching of downloaded datasets
 - Thread-safe, fast, and has a low memory footprint
-- Supports dataset versioning and update checks
+- Supports dataset updates and versioning
 
-See the [ROADMAP.md](ROADMAP.md) for planned features and the [docs](docs) folder for detailed documentation.
+See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
 > [!IMPORTANT]
 > Gaggle is in early development, so bugs and breaking changes are expected.
@@ -101,8 +101,8 @@ select gaggle_set_credentials('your-username', 'your-api-key');
 -- Get extension version
 select gaggle_version();
 
--- List files in the downloaded dataset
--- (Note that if the datasets is not downloaded yet, it will be downloaded and cached first)
+-- List files in the dataset
+-- (Note that if the datasets is not downloaded, it will be downloaded and cached automatically)
 select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
@@ -149,19 +149,6 @@ Check out the [docs](docs/README.md) directory for the API documentation, how to
 Check out the [examples](docs/examples) directory for SQL scripts that show how to use Gaggle.
 
 ---
-
-### Configuration
-
-See [CONFIGURATION.md](docs/CONFIGURATION.md) for full details. Main environment variables:
-
-- `GAGGLE_CACHE_DIR` — cache directory path (default: `~/.cache/gaggle`)
-- `GAGGLE_HTTP_TIMEOUT` — HTTP timeout (in seconds)
-- `GAGGLE_HTTP_RETRY_ATTEMPTS` — retry attempts after the initial try
-- `GAGGLE_HTTP_RETRY_DELAY_MS` — initial backoff delay (in milliseconds)
-- `GAGGLE_HTTP_RETRY_MAX_DELAY_MS` — maximum backoff delay cap (in milliseconds)
-- `GAGGLE_LOG_LEVEL` — structured log level for the Rust core (like `INFO` or `DEBUG`)
-- `GAGGLE_OFFLINE` — disable network; only use cached data (downloads fail fast if not cached)
-- `KAGGLE_USERNAME`, `KAGGLE_KEY` — Kaggle credentials (alternative to the SQL call)
 
 ### Contributing
 

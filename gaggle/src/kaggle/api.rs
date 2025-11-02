@@ -1,5 +1,6 @@
 use crate::error::GaggleError;
 use reqwest::blocking::Client;
+
 #[cfg(test)]
 use std::cell::RefCell;
 use std::env;
@@ -147,7 +148,7 @@ mod tests {
     #[test]
     fn test_with_retries_exhausts_attempts() {
         env::set_var("GAGGLE_HTTP_RETRY_ATTEMPTS", "2");
-        env::set_var("GAGGLE_HTTP_RETRY_DELAY_MS", "10");
+        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.001");
 
         let mut call_count = 0;
         let result = with_retries(|| {
@@ -159,13 +160,13 @@ mod tests {
         assert_eq!(call_count, 3);
 
         env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
-        env::remove_var("GAGGLE_HTTP_RETRY_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
     }
 
     #[test]
     fn test_with_retries_exponential_backoff() {
-        env::set_var("GAGGLE_HTTP_RETRY_DELAY_MS", "10");
-        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS", "100");
+        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.01");
+        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "0.1");
 
         let start = std::time::Instant::now();
         let mut call_count = 0;
@@ -179,17 +180,17 @@ mod tests {
         });
         let elapsed = start.elapsed();
 
-        // Should have some delay between retries
-        assert!(elapsed.as_millis() >= 10); // At least one 10ms delay
+        // Should have some delay between retries (at least ~10ms)
+        assert!(elapsed.as_millis() >= 10);
 
-        env::remove_var("GAGGLE_HTTP_RETRY_DELAY_MS");
-        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
+        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
     }
 
     #[test]
     fn test_with_retries_respects_max_delay() {
-        env::set_var("GAGGLE_HTTP_RETRY_DELAY_MS", "50");
-        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS", "100");
+        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.05");
+        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "0.1");
         env::set_var("GAGGLE_HTTP_RETRY_ATTEMPTS", "5");
 
         let start = std::time::Instant::now();
@@ -198,14 +199,13 @@ mod tests {
         });
         let elapsed = start.elapsed();
 
-        // With exponential backoff capped at 100ms and 5 retries:
-        // delays would be: 50, 100, 100, 100, 100 = 450ms total
-        // But we add some tolerance for test execution overhead
+        // With exponential backoff capped ~0.1s and 5 retries:
+        // delays ~0.05, 0.1, 0.1, 0.1, 0.1 ~= 0.45s
         assert!(elapsed.as_millis() >= 200);
         assert!(elapsed.as_millis() < 1000);
 
-        env::remove_var("GAGGLE_HTTP_RETRY_DELAY_MS");
-        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
+        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
         env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
     }
 }

@@ -16,7 +16,7 @@ The table below includes the information about all SQL functions exposed by Gagg
 | 10 | `gaggle_update_dataset(dataset_path VARCHAR)`                   | `VARCHAR`        | Forces update to latest version (ignores cache). Returns local path to freshly downloaded dataset.                        |
 | 11 | `gaggle_version_info(dataset_path VARCHAR)`                     | `VARCHAR (JSON)` | Returns version info: `cached_version`, `latest_version`, `is_current`, `is_cached`.                                      |
 | 12 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object/array into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`.                 |
-| 13 | `gaggle_file_paths(dataset_path VARCHAR, filename VARCHAR)`     | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                        |
+| 13 | `gaggle_file_path(dataset_path VARCHAR, filename VARCHAR)`      | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                        |
 
 > [!NOTE]
 > Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
@@ -36,10 +36,10 @@ Replacement scan (transparent table read):
 - Single file: `'kaggle:owner/dataset/file.ext'`
 - Glob: `'kaggle:owner/dataset/*.ext'`
 - Reader is chosen by extension:
-  - `.parquet`/`.parq` -> `read_parquet`
-  - `.json`/`.jsonl`/`.ndjson` -> `read_json_auto`
-  - `.xlsx` -> `read_excel` (requires DuckDB to be built with the Excel reader)
-  - everything else -> `read_csv_auto`
+    - `.parquet`/`.parq` -> `read_parquet`
+    - `.json`/`.jsonl`/`.ndjson` -> `read_json_auto`
+    - `.xlsx` -> `read_excel` (requires DuckDB to be built with the Excel reader)
+    - everything else -> `read_csv_auto`
 
 ---
 
@@ -59,7 +59,8 @@ select gaggle_set_credentials('your-username', 'your-api-key');
 select gaggle_version();
 
 -- Search datasets (JSON string)
-select gaggle_search('iris', 1, 5); -- Disabled in offline mode (GAGGLE_OFFLINE=1)
+select gaggle_search('iris', 1, 5);
+-- Disabled in offline mode (GAGGLE_OFFLINE=1)
 
 -- Download a dataset and get its local path
 select gaggle_download('uciml/iris') as local_path;
@@ -188,14 +189,20 @@ See [CONFIGURATION.md](CONFIGURATION.md) for full details. Key environment varia
 - `GAGGLE_CACHE_DIR` — cache directory path (default: `~/.cache/gaggle`)
 - `GAGGLE_HTTP_TIMEOUT` — HTTP timeout (in seconds)
 - `GAGGLE_HTTP_RETRY_ATTEMPTS` — retry attempts after the initial try
-- `GAGGLE_HTTP_RETRY_DELAY_MS` — initial backoff delay (in milliseconds)
-- `GAGGLE_HTTP_RETRY_MAX_DELAY_MS` — maximum backoff delay cap (in milliseconds)
+- `GAGGLE_HTTP_RETRY_DELAY` — initial backoff delay (in seconds)
+- `GAGGLE_HTTP_RETRY_MAX_DELAY` — maximum backoff delay cap (in seconds)
 - `GAGGLE_LOG_LEVEL` — structured log level for the Rust core (e.g., `INFO`, `DEBUG`)
 - `GAGGLE_OFFLINE` — disable network; only use cached data (downloads fail fast if not cached)
-- `KAGGLE_USERNAME`, `KAGGLE_KEY` — Kaggle credentials (alternative to the SQL call)
+- `KAGGLE_USERNAME` and `KAGGLE_KEY` — Kaggle credentials (alternative to the SQL call)
 
 > [!NOTE]
-> Environment variables are case-sensitive on Unix-like systems. Changes take effect for subsequent operations in the same process.
+> Environment variables are case-sensitive on Unix-like systems. Changes take effect for subsequent operations in the
+> same process.
+
+#### Units
+
+- Storage sizes are reported in megabytes (MB) across SQL/API (for example: `gaggle_cache_info()` returns `size_mb`).
+- Timeouts and retry delays are configured in seconds (via clean environment variables without unit suffixes).
 
 ### Replacement Scan Readers
 
@@ -220,6 +227,6 @@ Gaggle is made up of two main components:
     - C-compatible FFI surface
 
 2. **C++ DuckDB Bindings (`gaggle/bindings/`)** that:
-    - Defines the custom SQL functions (for example: `gaggle_ls`, `gaggle_file_paths`, `gaggle_search`)
+    - Defines the custom SQL functions (for example: `gaggle_ls`, `gaggle_file_path`, `gaggle_search`)
     - Integrates with DuckDB’s extension system and replacement scans (`'kaggle:...'`)
     - Marshals values between DuckDB vectors and the Rust FFI

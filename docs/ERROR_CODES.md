@@ -159,7 +159,8 @@ Network error occurred during communication with Kaggle API.
 4. **Retry with backoff:**
    ```bash
    export GAGGLE_HTTP_RETRY_ATTEMPTS=5
-   export GAGGLE_HTTP_RETRY_DELAY_MS=2000
+   export GAGGLE_HTTP_RETRY_DELAY=2
+   export GAGGLE_HTTP_RETRY_MAX_DELAY=30
    ```
 
 5. **Check firewall settings:**

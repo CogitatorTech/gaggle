@@ -5,6 +5,12 @@ use std::fs;
 use crate::error;
 use crate::kaggle;
 
+/// Initialize logging for the Rust core based on GAGGLE_LOG_LEVEL
+#[no_mangle]
+pub extern "C" fn gaggle_init_logging() {
+    crate::init_logging();
+}
+
 /// Set Kaggle API credentials
 ///
 /// # Arguments
@@ -36,7 +42,8 @@ pub unsafe extern "C" fn gaggle_set_credentials(
         let username_str = CStr::from_ptr(username).to_str()?;
         let key_str = CStr::from_ptr(key).to_str()?;
 
-        kaggle::set_credentials(username_str, key_str)
+        kaggle::credentials::set_credentials(username_str, key_str)?;
+        Ok(())
     })();
 
     match result {
@@ -455,17 +462,16 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
     let cache_dir = crate::config::cache_dir_runtime();
 
     // Prefer fast metadata-based computation when possible
-    let size_mb_meta = crate::kaggle::download::get_total_cache_size_mb().unwrap_or(0);
+    let size_mb = crate::kaggle::download::get_total_cache_size_mb().unwrap_or(0);
 
-    // Determine size in bytes and MB
-    let (size_bytes, size_mb) = if size_mb_meta > 0 {
-        let bytes = size_mb_meta.saturating_mul(1024 * 1024);
-        (bytes, size_mb_meta)
-    } else {
+    // If metadata yields zero, fallback to scanning
+    let size_mb = if size_mb == 0 {
         match crate::utils::calculate_dir_size(&cache_dir) {
-            Ok(bytes) => (bytes, bytes / (1024 * 1024)),
-            Err(_) => (0, 0),
+            Ok(bytes) => bytes / (1024 * 1024),
+            Err(_) => 0,
         }
+    } else {
+        size_mb
     };
 
     let limit_mb = crate::config::cache_size_limit_mb();
@@ -483,8 +489,7 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
 
     let info = json!({
         "path": cache_dir.to_string_lossy(),
-        "size_bytes": size_bytes,
-        "size_mb": size_mb, // MiB (1024*1024)
+        "size_mb": size_mb, // MB (1024*1024)
         "limit_mb": limit_mb,
         "usage_percent": usage_percent,
         "is_soft_limit": is_soft_limit,

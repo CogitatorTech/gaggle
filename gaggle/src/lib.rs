@@ -15,6 +15,7 @@ pub use kaggle::parse_dataset_path;
 pub use kaggle::parse_dataset_path_with_version;
 
 use once_cell::sync::OnceCell;
+use std::io::IsTerminal;
 use tracing_subscriber::{fmt, EnvFilter};
 
 static LOG_INIT: OnceCell<()> = OnceCell::new();
@@ -29,7 +30,7 @@ pub fn init_logging() {
             .with_env_filter(filter)
             .with_target(false)
             .with_level(true)
-            .with_ansi(atty::is(atty::Stream::Stderr))
+            .with_ansi(std::io::stderr().is_terminal())
             .init();
     });
 }

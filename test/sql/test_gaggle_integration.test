@@ -1,7 +1,7 @@
 # group: [gaggle]
 
 # Test suite for Gaggle extension integration scenarios
-# Tests realistic usage patterns and workflows
+# Tests realistic usage patterns and commom workflows
 
 statement ok
 pragma enable_verification

@@ -6,11 +6,11 @@ load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 select gaggle_set_credentials('your-username', 'your-api-key') as credentials_set;
 
 -- Get path to specific file
-select gaggle_file_paths('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet') as file_path;
+select gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet') as file_path;
 
 -- Use the file path with DuckDB's read_parquet via prepared statement (no subqueries in args)
 prepare rp as select * from read_parquet(?) limit 10;
-execute rp(gaggle_file_paths('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
+execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
 -- Section 2: list and process multiple files
 select '## list and process dataset files (json and table)';
@@ -35,7 +35,7 @@ select gaggle_cache_info() as cache_status;
 
 -- Section 4: purge cache if needed
 select '## Purge cache (optional)';
--- select gaggle_purge_cache() as cache_purged;
+-- select gaggle_clear_cache() as cache_cleared;
 
 -- Section 5: Dataset versioning
 select '## Check dataset versions';

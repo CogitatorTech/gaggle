@@ -1,10 +1,11 @@
 use once_cell::sync::Lazy;
+
 #[cfg(test)]
 use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
 
-const DEFAULT_CACHE_DIR_NAME: &str = "gaggle_cache";
+const DEFAULT_CACHE_DIR_NAME: &str = "gaggle";
 
 pub static CONFIG: Lazy<GaggleConfig> = Lazy::new(GaggleConfig::from_env);
 
@@ -76,17 +77,19 @@ impl GaggleConfig {
 
     /// Get download wait timeout from env (default 30_000 ms)
     fn get_download_wait_timeout_ms() -> u64 {
-        env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS")
+        env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT")
             .ok()
-            .and_then(|v| v.parse().ok())
+            .and_then(|v| v.parse::<f64>().ok())
+            .map(|secs| (secs * 1000.0).round() as u64)
             .unwrap_or(30_000)
     }
 
     /// Get download wait poll interval from env (default 100 ms)
     fn get_download_wait_poll_ms() -> u64 {
-        env::var("GAGGLE_DOWNLOAD_WAIT_POLL_MS")
+        env::var("GAGGLE_DOWNLOAD_WAIT_POLL")
             .ok()
-            .and_then(|v| v.parse().ok())
+            .and_then(|v| v.parse::<f64>().ok())
+            .map(|secs| (secs * 1000.0).round() as u64)
             .unwrap_or(100)
     }
 }
@@ -141,17 +144,19 @@ pub fn http_retry_attempts() -> u32 {
 
 /// HTTP retry delay in milliseconds (default 1000)
 pub fn http_retry_delay_ms() -> u64 {
-    env::var("GAGGLE_HTTP_RETRY_DELAY_MS")
+    env::var("GAGGLE_HTTP_RETRY_DELAY")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<f64>().ok())
+        .map(|secs| (secs * 1000.0).round() as u64)
         .unwrap_or(1000)
 }
 
 /// HTTP retry max delay in milliseconds (default 30000)
 pub fn http_retry_max_delay_ms() -> u64 {
-    env::var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS")
+    env::var("GAGGLE_HTTP_RETRY_MAX_DELAY")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<f64>().ok())
+        .map(|secs| (secs * 1000.0).round() as u64)
         .unwrap_or(30000)
 }
 
@@ -177,21 +182,23 @@ pub fn cache_limit_is_soft() -> bool {
 
 /// Runtime-resolved download wait timeout in milliseconds
 pub fn download_wait_timeout_ms() -> u64 {
-    env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS")
+    env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<f64>().ok())
+        .map(|secs| (secs * 1000.0).round() as u64)
         .unwrap_or(CONFIG.download_wait_timeout_ms)
 }
 
 /// Runtime-resolved download wait poll interval in milliseconds
 pub fn download_wait_poll_interval_ms() -> u64 {
-    env::var("GAGGLE_DOWNLOAD_WAIT_POLL_MS")
+    env::var("GAGGLE_DOWNLOAD_WAIT_POLL")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<f64>().ok())
+        .map(|secs| (secs * 1000.0).round() as u64)
         .unwrap_or(CONFIG.download_wait_poll_ms)
 }
 
-/// Whether offline mode is enabled (disables network operations)j Controlled by GAGGLE_OFFLINE
+/// Whether offline mode is enabled (disables network operations). Controlled by GAGGLE_OFFLINE
 pub fn offline_mode() -> bool {
     std::env::var("GAGGLE_OFFLINE")
         .ok()
@@ -203,6 +210,7 @@ pub fn offline_mode() -> bool {
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::env;
 
     #[test]
     #[serial]
@@ -338,8 +346,8 @@ mod tests {
     #[serial]
     fn test_http_retry_defaults() {
         env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
-        env::remove_var("GAGGLE_HTTP_RETRY_DELAY_MS");
-        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
+        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
         assert_eq!(http_retry_attempts(), 3);
         assert_eq!(http_retry_delay_ms(), 1000);
         assert_eq!(http_retry_max_delay_ms(), 30_000);
@@ -349,31 +357,31 @@ mod tests {
     #[serial]
     fn test_http_retry_env() {
         env::set_var("GAGGLE_HTTP_RETRY_ATTEMPTS", "3");
-        env::set_var("GAGGLE_HTTP_RETRY_DELAY_MS", "250");
+        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.25");
         assert_eq!(http_retry_attempts(), 3);
         assert_eq!(http_retry_delay_ms(), 250);
         env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
-        env::remove_var("GAGGLE_HTTP_RETRY_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
     }
 
     #[test]
     #[serial]
     fn test_http_retry_max_delay_configurable() {
-        let prev = env::var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS").ok();
-        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS", "5000");
+        let prev = env::var("GAGGLE_HTTP_RETRY_MAX_DELAY").ok();
+        env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "5");
         let max_delay = http_retry_max_delay_ms();
         assert_eq!(max_delay, 5000);
         if let Some(v) = prev {
-            env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS", v);
+            env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", v);
         } else {
-            env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS");
+            env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
         }
     }
 
     #[test]
     #[serial]
     fn test_http_retry_max_delay_default() {
-        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY_MS");
+        env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
         let max_delay = http_retry_max_delay_ms();
         assert_eq!(max_delay, 30_000);
     }
@@ -504,12 +512,12 @@ mod tests {
     #[test]
     #[serial]
     fn test_download_wait_runtime_overrides() {
-        env::set_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS", "1234");
-        env::set_var("GAGGLE_DOWNLOAD_WAIT_POLL_MS", "17");
+        env::set_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT", "1.234");
+        env::set_var("GAGGLE_DOWNLOAD_WAIT_POLL", "0.017");
         assert_eq!(download_wait_timeout_ms(), 1234);
         assert_eq!(download_wait_poll_interval_ms(), 17);
-        env::remove_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS");
-        env::remove_var("GAGGLE_DOWNLOAD_WAIT_POLL_MS");
+        env::remove_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT");
+        env::remove_var("GAGGLE_DOWNLOAD_WAIT_POLL");
     }
 
     #[test]

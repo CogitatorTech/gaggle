@@ -74,7 +74,10 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
             GaggleError::CredentialsError(format!("Cannot read kaggle.json: {}", e))
         })?;
 
-        let json: serde_json::Value = serde_json::from_str(&content)?;
+        let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
+            GaggleError::CredentialsError(format!("Invalid JSON in kaggle.json: {}", e))
+        })?;
+
         let username = json["username"]
             .as_str()
             .ok_or_else(|| {

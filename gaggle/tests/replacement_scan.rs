@@ -1,6 +1,4 @@
-// filepath: /home/hassan/Workspace/RustRoverProjects/gaggle/gaggle/tests/replacement_scan.rs
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -81,7 +79,7 @@ fn test_replacement_scan_csv_and_json() {
 
     // In CSV output with -csv, results are printed one per line without headers
     // We expect two lines: 1 and 3
-    let mut nums: Vec<i64> = stdout
+    let nums: Vec<i64> = stdout
         .lines()
         .filter_map(|l| l.trim().parse::<i64>().ok())
         .collect();

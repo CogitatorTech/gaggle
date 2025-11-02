@@ -26,22 +26,22 @@ limit 5;
 
 -- Section 4: download a dataset
 select '## Download a dataset';
-select gaggle_download('owid/covid-latest-data') as download_path;
+select gaggle_download('uciml/iris') as download_path;
 
 -- Section 5: list files (JSON)
 select '## list files (json)';
 select to_json(
          list(struct_pack(name := name, size := size, path := path))
        ) as files_json
-from gaggle_ls('owid/covid-latest-data');
+from gaggle_ls('uciml/iris');
 
 -- Section 5b: list files (table)
 select '## list files (table)';
-select * from gaggle_ls('owid/covid-latest-data') limit 5;
+select * from gaggle_ls('uciml/iris') limit 5;
 
 -- Section 6: get dataset metadata
 select '## get dataset metadata';
-select gaggle_info('owid/covid-latest-data') as dataset_metadata;
+select gaggle_info('uciml/iris') as dataset_metadata;
 
 -- Section 7: get cache information
 select '## Get cache information';

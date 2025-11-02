@@ -1,4 +1,3 @@
-// filepath: /home/hassan/Workspace/RustRoverProjects/gaggle/gaggle/src/utils.rs
 use std::fs;
 use std::path::Path;
 

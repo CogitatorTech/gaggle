@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 
 set(CORROSION_VERBOSE_OUTPUT ON)
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED 1)
+
+# We need C++17 for std::filesystem on all platforms
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # --- Fallback platform detection (only if DuckDB build system did not set these) ---
@@ -221,4 +223,21 @@ if(TARGET ${EXTENSION_NAME})
     ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
 else()
   message(STATUS "[gaggle] No C++ extension target built; skipping install directive.")
+endif()
+
+# Link filesystem library on older libstdc++ (GCC < 9 requires -lstdc++fs)
+set(_GAGGLE_FS_LIB "")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+    set(_GAGGLE_FS_LIB stdc++fs)
+  endif()
+endif()
+
+if(_GAGGLE_FS_LIB)
+  if (TARGET ${EXTENSION_NAME})
+    target_link_libraries(${EXTENSION_NAME} ${_GAGGLE_FS_LIB})
+  endif()
+  if (TARGET ${LOADABLE_EXTENSION_NAME})
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} ${_GAGGLE_FS_LIB})
+  endif()
 endif()

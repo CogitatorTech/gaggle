@@ -39,7 +39,7 @@ It outlines features to be implemented and their current status.
     * [x] CSV and TSV file reading.
     * [x] Parquet file reading.
     * [x] JSON file reading.
-    * [ ] Excel (XLSX) file reading. (Available when DuckDB is built with the Excel reader; replacement scan routes `.xlsx` to `read_excel`.)
+    * [x] Excel (XLSX) file reading.
 * **Querying Datasets**
     * [x] Replacement scan for `kaggle:` URLs.
     * [ ] Virtual table support for lazy loading.
@@ -66,8 +66,8 @@ It outlines features to be implemented and their current status.
     * [x] Detailed error codes for programmatic error handling.
 * **Resilience**
     * [x] Automatic retry on network failures.
-    * [ ] Graceful degradation when Kaggle API is unavailable.
     * [x] Local-only mode for cached datasets (via `GAGGLE_OFFLINE`).
+    * [ ] Graceful degradation when Kaggle API is unavailable.
 
 ### 6. Documentation and Distribution
 

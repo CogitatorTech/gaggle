@@ -6,10 +6,11 @@
 namespace duckdb {
 
 /**
- * @brief The GaggleExtension class is the main entry point for the Gaggle DuckDB extension.
+ * @brief The GaggleExtension class is the main entry point for the Gaggle
+ * DuckDB extension.
  *
- * This class is responsible for loading the extension, providing its name, and its version.
- * It inherits from the `duckdb::Extension` base class.
+ * This class is responsible for loading the extension, providing its name, and
+ * its version. It inherits from the `duckdb::Extension` base class.
  */
 class GaggleExtension : public Extension {
 public:
