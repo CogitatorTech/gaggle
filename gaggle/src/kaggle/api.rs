@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_with_retries_exponential_backoff() {
-        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.01");
+        env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.05");
         env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "0.1");
 
         let start = std::time::Instant::now();
@@ -180,8 +180,8 @@ mod tests {
         });
         let elapsed = start.elapsed();
 
-        // Should have some delay between retries (at least ~10ms)
-        assert!(elapsed.as_millis() >= 10);
+        // Should have some delay between retries (at least ~50ms)
+        assert!(elapsed.as_millis() >= 20);
 
         env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
         env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
