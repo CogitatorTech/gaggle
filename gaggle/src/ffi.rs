@@ -311,6 +311,139 @@ pub extern "C" fn gaggle_clear_cache() -> i32 {
     }
 }
 
+/// Enforce cache size limit by evicting oldest datasets
+///
+/// # Returns
+///
+/// * `0` on success.
+/// * `-1` on failure.
+#[no_mangle]
+pub extern "C" fn gaggle_enforce_cache_limit() -> i32 {
+    let result = kaggle::download::enforce_cache_limit_now();
+
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            error::set_last_error(&e);
+            -1
+        }
+    }
+}
+
+/// Check if cached dataset is the current version
+///
+/// # Arguments
+///
+/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+///
+/// # Returns
+///
+/// * `1` if cached version is current.
+/// * `0` if cached version is outdated or not cached.
+/// * `-1` on error.
+///
+/// # Safety
+///
+/// * The `dataset_path` pointer must not be null.
+/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) -> i32 {
+    error::clear_last_error_internal();
+
+    let result = (|| -> Result<bool, error::GaggleError> {
+        if dataset_path.is_null() {
+            return Err(error::GaggleError::NullPointer);
+        }
+        let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        kaggle::is_dataset_current(path_str)
+    })();
+
+    match result {
+        Ok(true) => 1,
+        Ok(false) => 0,
+        Err(e) => {
+            error::set_last_error(&e);
+            -1
+        }
+    }
+}
+
+/// Force update dataset to latest version (ignores cache)
+///
+/// # Arguments
+///
+/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+///
+/// # Returns
+///
+/// A pointer to a null-terminated C string containing the local path, or NULL on failure.
+/// The caller must free this pointer using `gaggle_free()`.
+///
+/// # Safety
+///
+/// * The `dataset_path` pointer must not be null.
+/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *mut c_char {
+    error::clear_last_error_internal();
+
+    let result = (|| -> Result<String, error::GaggleError> {
+        if dataset_path.is_null() {
+            return Err(error::GaggleError::NullPointer);
+        }
+        let path_str = CStr::from_ptr(dataset_path).to_str()?;
+
+        let local_path = kaggle::update_dataset(path_str)?;
+        Ok(local_path.to_string_lossy().to_string())
+    })();
+
+    match result {
+        Ok(path) => string_to_c_string(path),
+        Err(e) => {
+            error::set_last_error(&e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Get version information for a dataset
+///
+/// # Arguments
+///
+/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+///
+/// # Returns
+///
+/// A pointer to a null-terminated C string containing JSON version info, or NULL on failure.
+/// The caller must free this pointer using `gaggle_free()`.
+///
+/// # Safety
+///
+/// * The `dataset_path` pointer must not be null.
+/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char) -> *mut c_char {
+    error::clear_last_error_internal();
+
+    let result = (|| -> Result<String, error::GaggleError> {
+        if dataset_path.is_null() {
+            return Err(error::GaggleError::NullPointer);
+        }
+        let path_str = CStr::from_ptr(dataset_path).to_str()?;
+
+        let info = kaggle::get_dataset_version_info(path_str)?;
+        Ok(info.to_string())
+    })();
+
+    match result {
+        Ok(json) => string_to_c_string(json),
+        Err(e) => {
+            error::set_last_error(&e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Get cache information
 ///
 /// # Returns
@@ -323,10 +456,26 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
 
     let size_bytes = calculate_dir_size(&cache_dir).unwrap_or(0);
     let size_mb = size_bytes / (1024 * 1024);
-    // Only three keys: path, size (MB), type (local)
+
+    let limit_mb = crate::config::cache_size_limit_mb();
+    let is_soft_limit = crate::config::cache_limit_is_soft();
+
+    let usage_percent = if let Some(limit) = limit_mb {
+        if limit > 0 {
+            ((size_mb as f64 / limit as f64) * 100.0) as u64
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
     let info = json!({
         "path": cache_dir.to_string_lossy(),
-        "size": size_mb,
+        "size_mb": size_mb,
+        "limit_mb": limit_mb,
+        "usage_percent": usage_percent,
+        "is_soft_limit": is_soft_limit,
         "type": "local",
     });
     string_to_c_string(info.to_string())
@@ -554,9 +703,12 @@ mod tests {
             // Should be valid JSON
             assert!(info_str.starts_with('{'));
             assert!(info_str.ends_with('}'));
-            // Should contain only the documented keys
+            // Should contain the documented keys
             assert!(info_str.contains("\"path\""));
-            assert!(info_str.contains("\"size\""));
+            assert!(info_str.contains("\"size_mb\""));
+            assert!(info_str.contains("\"limit_mb\""));
+            assert!(info_str.contains("\"usage_percent\""));
+            assert!(info_str.contains("\"is_soft_limit\""));
             assert!(info_str.contains("\"type\""));
 
             gaggle_free(info_ptr);
@@ -709,9 +861,12 @@ mod tests {
         unsafe {
             let info_cstr = CStr::from_ptr(info_ptr);
             let info_str = info_cstr.to_str().unwrap();
-            // Check for the new keys: path, size (MB), type
+            // Check for the keys: path, size_mb, limit_mb, usage_percent, is_soft_limit, type
             assert!(info_str.contains("\"path\""));
-            assert!(info_str.contains("\"size\""));
+            assert!(info_str.contains("\"size_mb\""));
+            assert!(info_str.contains("\"limit_mb\""));
+            assert!(info_str.contains("\"usage_percent\""));
+            assert!(info_str.contains("\"is_soft_limit\""));
             assert!(info_str.contains("\"type\""));
 
             gaggle_free(info_ptr);

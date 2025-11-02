@@ -18,6 +18,9 @@ It outlines features to be implemented and their current status.
     * [x] List files in a dataset.
     * [x] Get dataset metadata.
     * [ ] Upload DuckDB tables to Kaggle.
+    * [ ] Dataset version awareness and tracking.
+    * [ ] Download specific dataset versions.
+    * [ ] Check for dataset updates.
 
 ### 2. Caching and Storage
 
@@ -25,8 +28,7 @@ It outlines features to be implemented and their current status.
     * [x] Automatic caching of downloaded datasets.
     * [x] Clear cache functionality.
     * [x] Get cache information (size and storage location).
-    * [ ] Set cache size limit.
-    * [ ] Cache expiration policies.
+    * [x] Set cache size limit.
 * **Storage**
     * [x] Store datasets in configurable directory.
     * [ ] Support for cloud storage backends (S3, GCS, and Azure).

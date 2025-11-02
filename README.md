@@ -118,9 +118,63 @@ from 'kaggle:habedi/flickr-8k-dataset-clean/*.parquet';
 
 -- Optionally, check cache info
 select gaggle_cache_info();
+
+-- Enforce cache size limit manually (automatic with soft limit by default)
+select gaggle_enforce_cache_limit();
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
+
+---
+
+### Configuration
+
+Gaggle can be configured using environment variables:
+
+#### Cache Management
+
+```bash
+# Set cache size limit (default: 100GB = 102400 MB)
+export GAGGLE_CACHE_SIZE_LIMIT_MB=51200  # 50GB
+
+# Set unlimited cache
+export GAGGLE_CACHE_SIZE_LIMIT_MB=unlimited
+
+# Set cache directory (default: ~/.cache/gaggle_cache or platform-specific)
+export GAGGLE_CACHE_DIR=/path/to/cache
+
+# Enable hard limit mode (prevents downloads when limit reached, default: soft limit)
+export GAGGLE_CACHE_HARD_LIMIT=true
+```
+
+#### Network Configuration
+
+```bash
+# HTTP timeout in seconds (default: 30)
+export GAGGLE_HTTP_TIMEOUT=60
+
+# HTTP retry attempts (default: 3)
+export GAGGLE_HTTP_RETRY_ATTEMPTS=5
+
+# HTTP retry delay in milliseconds (default: 1000)
+export GAGGLE_HTTP_RETRY_DELAY_MS=500
+
+# HTTP retry max delay in milliseconds (default: 30000)
+export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=60000
+```
+
+#### Authentication
+
+```bash
+# Kaggle API credentials (alternative to ~/.kaggle/kaggle.json)
+export KAGGLE_USERNAME=your-username
+export KAGGLE_KEY=your-api-key
+```
+
+> [!TIP]
+> **Soft Limit (Default):** Downloads complete even if they exceed the cache limit, then oldest datasets are automatically evicted using LRU (Least Recently Used) policy until under limit.
+>
+> **Hard Limit:** Would prevent downloads when limit is reached (not yet fully implemented).
 
 ---
 

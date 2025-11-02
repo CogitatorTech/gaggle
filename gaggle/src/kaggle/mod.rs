@@ -7,9 +7,12 @@ pub mod search;
 #[allow(unused_imports)]
 pub use credentials::{get_credentials, set_credentials, KaggleCredentials};
 #[allow(unused_imports)]
-pub use download::{download_dataset, get_dataset_file_path, list_dataset_files, DatasetFile};
+pub use download::{
+    download_dataset, get_dataset_file_path, get_dataset_version_info, is_dataset_current,
+    list_dataset_files, update_dataset, DatasetFile,
+};
 #[allow(unused_imports)]
-pub use metadata::{get_dataset_metadata, DatasetInfo};
+pub use metadata::{get_current_version, get_dataset_metadata, DatasetInfo};
 pub use search::search_datasets;
 
 /// Parse dataset path like "username/dataset-name"

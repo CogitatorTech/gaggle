@@ -41,6 +41,37 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
     Ok(json)
 }
 
+/// Get current version number of a dataset from Kaggle API
+pub fn get_current_version(dataset_path: &str) -> Result<String, GaggleError> {
+    let metadata = get_dataset_metadata(dataset_path)?;
+
+    // Try to extract version from metadata
+    // Kaggle API returns version in various fields depending on endpoint
+    if let Some(version) = metadata.get("currentVersionNumber") {
+        if let Some(v) = version.as_i64() {
+            return Ok(v.to_string());
+        }
+        if let Some(v) = version.as_str() {
+            return Ok(v.to_string());
+        }
+    }
+
+    if let Some(version) = metadata.get("versions") {
+        if let Some(arr) = version.as_array() {
+            if let Some(latest) = arr.first() {
+                if let Some(v) = latest.get("versionNumber") {
+                    if let Some(num) = v.as_i64() {
+                        return Ok(num.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Default to "1" if version info not available
+    Ok("1".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

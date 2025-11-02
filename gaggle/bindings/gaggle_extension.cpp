@@ -258,6 +258,119 @@ static void GetCacheInfo(DataChunk &args, ExpressionState &state,
 }
 
 /**
+ * @brief Implements the `gaggle_enforce_cache_limit()` SQL function.
+ */
+static void EnforceCacheLimit(DataChunk &args, ExpressionState &state,
+                              Vector &result) {
+  int rc = gaggle_enforce_cache_limit();
+  bool success = rc == 0;
+  if (!success) {
+    throw InvalidInputException("Failed to enforce cache limit: " +
+                                GetGaggleError());
+  }
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  ConstantVector::GetData<bool>(result)[0] = success;
+  ConstantVector::SetNull(result, false);
+}
+
+/**
+ * @brief Implements the `gaggle_is_current(dataset_path)` SQL function.
+ */
+static void IsDatasetCurrent(DataChunk &args, ExpressionState &state,
+                             Vector &result) {
+  if (args.ColumnCount() != 1) {
+    throw InvalidInputException(
+        "gaggle_is_current(dataset_path) expects exactly 1 argument");
+  }
+  if (args.size() == 0) {
+    return;
+  }
+
+  auto path_val = args.data[0].GetValue(0);
+  if (path_val.IsNull()) {
+    throw InvalidInputException("Dataset path cannot be NULL");
+  }
+
+  std::string path_str = path_val.ToString();
+  int rc = gaggle_is_dataset_current(path_str.c_str());
+
+  if (rc < 0) {
+    throw InvalidInputException("Failed to check dataset version: " +
+                                GetGaggleError());
+  }
+
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  ConstantVector::GetData<bool>(result)[0] = (rc == 1);
+  ConstantVector::SetNull(result, false);
+}
+
+/**
+ * @brief Implements the `gaggle_update_dataset(dataset_path)` SQL function.
+ */
+static void UpdateDataset(DataChunk &args, ExpressionState &state,
+                          Vector &result) {
+  if (args.ColumnCount() != 1) {
+    throw InvalidInputException(
+        "gaggle_update_dataset(dataset_path) expects exactly 1 argument");
+  }
+  if (args.size() == 0) {
+    return;
+  }
+
+  auto path_val = args.data[0].GetValue(0);
+  if (path_val.IsNull()) {
+    throw InvalidInputException("Dataset path cannot be NULL");
+  }
+
+  std::string path_str = path_val.ToString();
+  char *local_path = gaggle_update_dataset(path_str.c_str());
+
+  if (local_path == nullptr) {
+    throw InvalidInputException("Failed to update dataset: " +
+                                GetGaggleError());
+  }
+
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, local_path);
+  ConstantVector::SetNull(result, false);
+  gaggle_free(local_path);
+}
+
+/**
+ * @brief Implements the `gaggle_version_info(dataset_path)` SQL function.
+ */
+static void GetDatasetVersionInfo(DataChunk &args, ExpressionState &state,
+                                  Vector &result) {
+  if (args.ColumnCount() != 1) {
+    throw InvalidInputException(
+        "gaggle_version_info(dataset_path) expects exactly 1 argument");
+  }
+  if (args.size() == 0) {
+    return;
+  }
+
+  auto path_val = args.data[0].GetValue(0);
+  if (path_val.IsNull()) {
+    throw InvalidInputException("Dataset path cannot be NULL");
+  }
+
+  std::string path_str = path_val.ToString();
+  char *version_json = gaggle_dataset_version_info(path_str.c_str());
+
+  if (version_json == nullptr) {
+    throw InvalidInputException("Failed to get version info: " +
+                                GetGaggleError());
+  }
+
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  ConstantVector::GetData<string_t>(result)[0] =
+      StringVector::AddString(result, version_json);
+  ConstantVector::SetNull(result, false);
+  gaggle_free(version_json);
+}
+
+/**
  * @brief Implements the `gaggle_json_each(json)` SQL function.
  * Returns newline-delimited JSON rows for each element/key in the input JSON.
  */
@@ -557,6 +670,20 @@ static void LoadInternal(ExtensionLoader &loader) {
                                          LogicalType::BOOLEAN, ClearCache));
   loader.RegisterFunction(ScalarFunction("gaggle_cache_info", {},
                                          LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(ScalarFunction("gaggle_enforce_cache_limit", {},
+                                         LogicalType::BOOLEAN,
+                                         EnforceCacheLimit));
+  loader.RegisterFunction(ScalarFunction("gaggle_is_current",
+                                         {LogicalType::VARCHAR},
+                                         LogicalType::BOOLEAN,
+                                         IsDatasetCurrent));
+  loader.RegisterFunction(ScalarFunction("gaggle_update_dataset",
+                                         {LogicalType::VARCHAR},
+                                         LogicalType::VARCHAR, UpdateDataset));
+  loader.RegisterFunction(ScalarFunction("gaggle_version_info",
+                                         {LogicalType::VARCHAR},
+                                         LogicalType::VARCHAR,
+                                         GetDatasetVersionInfo));
   loader.RegisterFunction(ScalarFunction("gaggle_json_each",
                                          {LogicalType::VARCHAR},
                                          LogicalType::VARCHAR, JsonEach));

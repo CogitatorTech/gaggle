@@ -23,6 +23,28 @@ extern "C" {
 #endif // __cplusplus
 
 /**
+ * Retrieves the last error message set in the current thread.
+ *
+ * After an FFI function returns an error code, this function can be called
+ * to get a more descriptive, human-readable error message.
+ *
+ * # Returns
+ *
+ * A pointer to a null-terminated C string containing the last error message.
+ * Returns a null pointer if no error has occurred since the last call.
+ * The caller **must not** free this pointer, as it is managed by a thread-local static variable.
+ */
+ const char *gaggle_last_error(void);
+
+/**
+ * Clears the last error for the current thread.
+ *
+ * This is useful for ensuring that old error messages don't persist
+ * and get confused with new errors.
+ */
+ void gaggle_clear_last_error(void);
+
+/**
  * Set Kaggle API credentials
  *
  * # Arguments
@@ -172,6 +194,74 @@ char *gaggle_download_dataset(const char *dataset_path);
  int32_t gaggle_clear_cache(void);
 
 /**
+ * Enforce cache size limit by evicting oldest datasets
+ *
+ * # Returns
+ *
+ * * `0` on success.
+ * * `-1` on failure.
+ */
+ int32_t gaggle_enforce_cache_limit(void);
+
+/**
+ * Check if cached dataset is the current version
+ *
+ * # Arguments
+ *
+ * * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+ *
+ * # Returns
+ *
+ * * `1` if cached version is current.
+ * * `0` if cached version is outdated or not cached.
+ * * `-1` on error.
+ *
+ * # Safety
+ *
+ * * The `dataset_path` pointer must not be null.
+ * * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+ */
+ int32_t gaggle_is_dataset_current(const char *dataset_path);
+
+/**
+ * Force update dataset to latest version (ignores cache)
+ *
+ * # Arguments
+ *
+ * * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+ *
+ * # Returns
+ *
+ * A pointer to a null-terminated C string containing the local path, or NULL on failure.
+ * The caller must free this pointer using `gaggle_free()`.
+ *
+ * # Safety
+ *
+ * * The `dataset_path` pointer must not be null.
+ * * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+ */
+ char *gaggle_update_dataset(const char *dataset_path);
+
+/**
+ * Get version information for a dataset
+ *
+ * # Arguments
+ *
+ * * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
+ *
+ * # Returns
+ *
+ * A pointer to a null-terminated C string containing JSON version info, or NULL on failure.
+ * The caller must free this pointer using `gaggle_free()`.
+ *
+ * # Safety
+ *
+ * * The `dataset_path` pointer must not be null.
+ * * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+ */
+ char *gaggle_dataset_version_info(const char *dataset_path);
+
+/**
  * Get cache information
  *
  * # Returns
@@ -191,9 +281,6 @@ char *gaggle_download_dataset(const char *dataset_path);
  * # Returns
  *
  * A pointer to a null-terminated C string containing newline-delimited JSON objects
- * representing each key-value pair (for objects) or each element (for arrays).
- * Each line is a JSON object with "key", "value", "type", and "path" fields.
- * The caller must free this pointer using `gaggle_free()`.
  *
  * # Safety
  *
@@ -201,28 +288,6 @@ char *gaggle_download_dataset(const char *dataset_path);
  * * The memory pointed to by `json_str` must be a valid, null-terminated C string.
  */
  char *gaggle_json_each(const char *json_str);
-
-/**
- * Retrieves the last error message set in the current thread.
- *
- * After an FFI function returns an error code, this function can be called
- * to get a more descriptive, human-readable error message.
- *
- * # Returns
- *
- * A pointer to a null-terminated C string containing the last error message.
- * Returns a null pointer if no error has occurred since the last call.
- * The caller **must not** free this pointer, as it is managed by a thread-local static variable.
- */
- const char *gaggle_last_error(void);
-
-/**
- * Clears the last error for the current thread.
- *
- * This is useful for ensuring that old error messages don't persist
- * and get confused with new errors.
- */
- void gaggle_clear_last_error(void);
 
 #ifdef __cplusplus
 }  // extern "C"

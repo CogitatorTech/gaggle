@@ -16,19 +16,35 @@ Gaggle supports configuration via environment variables to customize its behavio
   export GAGGLE_CACHE_DIR="/var/cache/gaggle"
   ```
 
-##### GAGGLE_CACHE_SIZE_LIMIT (planned)
+##### GAGGLE_CACHE_SIZE_LIMIT_MB
 
-- **Description**: Maximum cache size in bytes for downloaded datasets
-- **Type**: Integer (bytes)
-- **Default**: `10737418240` (10GB)
-- **Status**: Planned, not implemented yet
+- **Description**: Maximum cache size in megabytes for downloaded datasets
+- **Type**: Integer (megabytes) or "unlimited"
+- **Default**: `102400` (100GB)
+- **Status**: ✅ Implemented
+- **Behavior**: Uses soft limit by default - downloads complete even if they exceed the limit, then oldest datasets are automatically evicted using LRU (Least Recently Used) policy
 - **Example**:
   ```bash
-  ## Set to 50GB
-  export GAGGLE_CACHE_SIZE_LIMIT=53687091200
+  # Set to 50GB
+  export GAGGLE_CACHE_SIZE_LIMIT_MB=51200
 
-  ## Set to 5GB
-  export GAGGLE_CACHE_SIZE_LIMIT=5368709120
+  # Set to 5GB
+  export GAGGLE_CACHE_SIZE_LIMIT_MB=5120
+
+  # Set unlimited cache
+  export GAGGLE_CACHE_SIZE_LIMIT_MB=unlimited
+  ```
+
+##### GAGGLE_CACHE_HARD_LIMIT
+
+- **Description**: Enable hard limit mode (prevents downloads when cache limit would be exceeded)
+- **Type**: Boolean (accepts: true, yes, 1 for hard limit; false, no, 0 for soft limit)
+- **Default**: `false` (soft limit)
+- **Status**: ✅ Implemented
+- **Example**:
+  ```bash
+  # Enable hard limit (prevents downloads when cache is full)
+  export GAGGLE_CACHE_HARD_LIMIT=true
   ```
 
 #### HTTP Configuration
@@ -116,27 +132,27 @@ export GAGGLE_CACHE_DIR="/mnt/fast-ssd/kaggle-cache"
 SELECT gaggle_search('iris', 1, 10);
 ```
 
-#### Example 2: Larger Cache for Big Datasets (planned)
+#### Example 2: Larger Cache for Big Datasets
 
 ```bash
-## Set cache to 50GB for large datasets (planned)
-export GAGGLE_CACHE_SIZE_LIMIT=53687091200
+# Set cache to 50GB for large datasets
+export GAGGLE_CACHE_SIZE_LIMIT_MB=51200
 
-## Download and query large Kaggle datasets
+# Download and query large Kaggle datasets
 ./build/release/duckdb
 ```
 
 #### Example 3: Production Configuration
 
 ```bash
-## Complete production configuration
+# Complete production configuration
 export GAGGLE_CACHE_DIR="/var/lib/gaggle/cache"
-export GAGGLE_CACHE_SIZE_LIMIT=53687091200  ## 50GB (planned)
-export GAGGLE_HTTP_TIMEOUT=120              ## 2 minutes
-export GAGGLE_HTTP_RETRY_ATTEMPTS=5         ## Retry up to 5 times
-export GAGGLE_HTTP_RETRY_DELAY_MS=2000      ## 2 second initial delay
-export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=30000 ## Cap backoff at 30s
-export GAGGLE_LOG_LEVEL=WARN                ## Production logging (planned)
+export GAGGLE_CACHE_SIZE_LIMIT_MB=51200     # 50GB
+export GAGGLE_HTTP_TIMEOUT=120              # 2 minutes
+export GAGGLE_HTTP_RETRY_ATTEMPTS=5         # Retry up to 5 times
+export GAGGLE_HTTP_RETRY_DELAY_MS=2000      # 2 second initial delay
+export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=30000 # Cap backoff at 30s
+export GAGGLE_LOG_LEVEL=WARN                # Production logging (planned)
 
 ## Set Kaggle credentials
 export KAGGLE_USERNAME="your-username"
@@ -177,6 +193,13 @@ export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=60000 ## Cap at 60s
 You can verify your configuration at runtime:
 
 ```sql
+-- Check cache info (includes limit and usage)
+SELECT gaggle_cache_info();
+-- Returns: {"path": "...", "size_mb": 1024, "limit_mb": 102400, "usage_percent": 1, "is_soft_limit": true, "type": "local"}
+
+-- Manually enforce cache limit (LRU eviction)
+SELECT gaggle_enforce_cache_limit();
+
 -- Search datasets (requires valid credentials)
 SELECT gaggle_search('housing', 1, 10);
 

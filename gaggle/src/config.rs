@@ -131,6 +131,29 @@ pub fn http_retry_max_delay_ms() -> u64 {
         .unwrap_or(30000)
 }
 
+/// Cache size limit in megabytes (default 100GB = 102400 MB)
+/// Returns None if unlimited
+pub fn cache_size_limit_mb() -> Option<u64> {
+    match env::var("GAGGLE_CACHE_SIZE_LIMIT_MB").ok() {
+        Some(val) if val.to_lowercase() == "unlimited" => None,
+        Some(val) => val.parse().ok(),
+        None => Some(102400), // Default 100GB
+    }
+}
+
+/// Whether cache limit is a soft limit (default true)
+/// Soft limit allows download to complete even if it exceeds limit,
+/// then triggers cleanup afterwards
+pub fn cache_limit_is_soft() -> bool {
+    env::var("GAGGLE_CACHE_HARD_LIMIT")
+        .ok()
+        .map(|v| match v.to_lowercase().as_str() {
+            "true" | "yes" | "1" => false, // Hard limit
+            _ => true,                     // Soft limit (default)
+        })
+        .unwrap_or(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,5 +411,46 @@ mod tests {
         env::set_var("GAGGLE_HTTP_TIMEOUT", "42");
         assert_eq!(http_timeout_runtime_secs(), 42);
         env::remove_var("GAGGLE_HTTP_TIMEOUT");
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_size_limit_default() {
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        let limit = cache_size_limit_mb();
+        assert_eq!(limit, Some(102400)); // 100GB default
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_size_limit_custom() {
+        env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "50000");
+        let limit = cache_size_limit_mb();
+        assert_eq!(limit, Some(50000));
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_size_limit_unlimited() {
+        env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "unlimited");
+        let limit = cache_size_limit_mb();
+        assert_eq!(limit, None);
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_limit_soft_by_default() {
+        env::remove_var("GAGGLE_CACHE_HARD_LIMIT");
+        assert!(cache_limit_is_soft());
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_limit_hard() {
+        env::set_var("GAGGLE_CACHE_HARD_LIMIT", "true");
+        assert!(!cache_limit_is_soft());
+        env::remove_var("GAGGLE_CACHE_HARD_LIMIT");
     }
 }

@@ -10,9 +10,10 @@ The table below includes the information about all SQL functions exposed by Gagg
 | 4 | `gaggle_info(dataset_path VARCHAR)`                             | `VARCHAR (JSON)` | Returns metadata for a dataset as JSON (for example: title, url, last_updated).                                          |
 | 5 | `gaggle_version()`                                              | `VARCHAR`        | Returns the extension version string (for example: `"0.1.0"`).                                                           |
 | 6 | `gaggle_purge_cache()`                                          | `BOOLEAN`        | Clears the dataset cache directory. Returns `true` on success.                                                           |
-| 7 | `gaggle_cache_info()`                                           | `VARCHAR (JSON)` | Returns cache info JSON with fields like `path`, `size` (in MB), and `type` (always `"local"`).                          |
-| 8 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object/array into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`.                |
-| 9 | `gaggle_file_paths(dataset_path VARCHAR, filename VARCHAR)`     | `VARCHAR`        | Resolves a specific file’s local path inside a downloaded dataset.                                                       |
+| 7 | `gaggle_cache_info()`                                           | `VARCHAR (JSON)` | Returns cache info JSON with `path`, `size_mb`, `limit_mb`, `usage_percent`, `is_soft_limit`, and `type` fields.         |
+| 8 | `gaggle_enforce_cache_limit()`                                  | `BOOLEAN`        | Manually enforces cache size limit using LRU eviction. Returns `true` on success. (Automatic with soft limit by default).|
+| 9 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object/array into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`.                |
+| 10| `gaggle_file_paths(dataset_path VARCHAR, filename VARCHAR)`     | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                       |
 
 > [!NOTE]
 > Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
@@ -25,7 +26,7 @@ Table function:
 
 | #  | Function                          | Return Type                                      | Description                                                                    |
 |----|:----------------------------------|:-------------------------------------------------|:-------------------------------------------------------------------------------|
-| 10 | `gaggle_ls(dataset_path VARCHAR)` | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursive) in the dataset’s local directory; `size` is in MB. |
+| 11 | `gaggle_ls(dataset_path VARCHAR)` | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursive) in the dataset's local directory; `size` is in MB. |
 
 Replacement scan (transparent table read):
 
@@ -92,6 +93,9 @@ from 'kaggle:owner/dataset/*.parquet';
 -- Purge cache and inspect info
 select gaggle_purge_cache();
 select gaggle_cache_info();
+
+-- Manually enforce cache size limit (LRU eviction of oldest datasets)
+select gaggle_enforce_cache_limit();
 
 -- Expand JSON into newline-delimited rows
 select gaggle_json_each('{"a":1,"b":[true,{"c":"x"}]}') as rows;
