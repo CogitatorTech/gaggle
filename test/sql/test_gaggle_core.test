@@ -26,9 +26,9 @@ select length(gaggle_cache_info()) > 0
 ----
 1
 
-# Test 4: gaggle_purge_cache() should succeed
+# Test 4: gaggle_clear_cache() should succeed
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 # Test 5: Verify gaggle functions are available and callable
 query I

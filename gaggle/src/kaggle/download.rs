@@ -3,12 +3,14 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
 use super::api::{build_client, get_api_base, with_retries};
 use super::credentials::get_credentials;
+use tracing::debug;
 
 /// Track ongoing dataset downloads to prevent concurrent downloads of the same dataset
 static DOWNLOAD_LOCKS: once_cell::sync::Lazy<Mutex<HashMap<String, ()>>> =
@@ -103,6 +105,14 @@ fn download_dataset_version(
         return Ok(cache_dir);
     }
 
+    // Offline mode: if not cached, fail fast
+    if crate::config::offline_mode() {
+        return Err(GaggleError::HttpRequestError(format!(
+            "Offline mode enabled; cannot download '{}'. Unset GAGGLE_OFFLINE to enable network.",
+            dataset_path
+        )));
+    }
+
     // Use a lock per dataset path (including version) to prevent concurrent downloads
     let lock_key = if let Some(ref v) = version {
         format!("{}/{}-v{}", owner, dataset, v)
@@ -111,9 +121,15 @@ fn download_dataset_version(
     };
 
     // Acquire a "lock" by inserting into the map
-    // If another thread is downloading, wait with timeout
-    const MAX_WAIT_ATTEMPTS: u32 = 300; // 30 seconds at 100ms intervals
-    let mut wait_attempts = 0;
+    // If another thread is downloading, wait with timeout (configurable)
+    let poll_ms = crate::config::download_wait_poll_interval_ms();
+    let timeout_ms = crate::config::download_wait_timeout_ms();
+    let max_attempts: u64 = if poll_ms == 0 {
+        0
+    } else {
+        timeout_ms / poll_ms
+    };
+    let mut wait_attempts: u64 = 0;
 
     loop {
         let mut locks = DOWNLOAD_LOCKS.lock();
@@ -125,15 +141,17 @@ fn download_dataset_version(
         drop(locks);
 
         // Check timeout to prevent indefinite waiting
-        wait_attempts += 1;
-        if wait_attempts >= MAX_WAIT_ATTEMPTS {
-            return Err(GaggleError::HttpRequestError(format!(
-                "Timeout waiting for download of {}. Another thread may have stalled.",
-                dataset_path
-            )));
+        if max_attempts > 0 {
+            if wait_attempts >= max_attempts {
+                return Err(GaggleError::HttpRequestError(format!(
+                    "Timeout waiting for download of {}. Another thread may have stalled.",
+                    dataset_path
+                )));
+            }
+            wait_attempts = wait_attempts.saturating_add(1);
         }
 
-        sleep(Duration::from_millis(100));
+        sleep(Duration::from_millis(poll_ms.max(1)));
 
         // Check again if download completed while we waited
         if marker_file.exists() {
@@ -166,8 +184,10 @@ fn download_dataset_version(
         format!("{}/datasets/download/{}/{}", get_api_base(), owner, dataset)
     };
 
+    debug!(%url, "downloading dataset");
+
     let client = build_client()?;
-    let response = with_retries(|| {
+    let mut response = with_retries(|| {
         client
             .get(&url)
             .basic_auth(&creds.username, Some(&creds.key))
@@ -182,10 +202,14 @@ fn download_dataset_version(
         )));
     }
 
-    // Save and extract ZIP
+    // Stream response to a temporary file to avoid large memory usage
     let zip_path = cache_dir.join("dataset.zip");
-    let content = response.bytes()?;
-    fs::write(&zip_path, &content)?;
+    let zip_file = fs::File::create(&zip_path)?;
+    let mut writer = BufWriter::new(zip_file);
+    response
+        .copy_to(&mut writer)
+        .map_err(|e| GaggleError::HttpRequestError(e.to_string()))?;
+    writer.flush().ok();
 
     // Extract ZIP - require at least one file extracted
     let extracted = extract_zip(&zip_path, &cache_dir)?;
@@ -194,10 +218,10 @@ fn download_dataset_version(
     }
 
     // Clean up ZIP file
-    fs::remove_file(&zip_path)?;
+    let _ = fs::remove_file(&zip_path);
 
     // Calculate dataset size in MB
-    let dataset_size_mb = calculate_dir_size(&cache_dir)
+    let dataset_size_mb = crate::utils::calculate_dir_size(&cache_dir)
         .unwrap_or(0)
         .saturating_div(1024 * 1024);
 
@@ -366,23 +390,6 @@ pub fn get_dataset_file_path(dataset_path: &str, filename: &str) -> Result<PathB
     Ok(file_path)
 }
 
-/// Calculate directory size in bytes
-fn calculate_dir_size(path: &Path) -> Result<u64, std::io::Error> {
-    let mut total = 0;
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let metadata = entry.metadata()?;
-            if metadata.is_dir() {
-                total += calculate_dir_size(&entry.path())?;
-            } else {
-                total += metadata.len();
-            }
-        }
-    }
-    Ok(total)
-}
-
 /// Get all cached datasets with their metadata
 fn get_cached_datasets() -> Result<Vec<(PathBuf, CacheMetadata)>, GaggleError> {
     let cache_root = crate::config::cache_dir_runtime().join("datasets");
@@ -418,7 +425,7 @@ fn get_cached_datasets() -> Result<Vec<(PathBuf, CacheMetadata)>, GaggleError> {
                             }
                             Err(_) => {
                                 // Legacy marker without metadata - calculate size
-                                let size_mb = calculate_dir_size(&dataset_path)
+                                let size_mb = crate::utils::calculate_dir_size(&dataset_path)
                                     .unwrap_or(0)
                                     .saturating_div(1024 * 1024);
                                 let owner = owner_entry.file_name().to_string_lossy().to_string();
@@ -872,7 +879,7 @@ mod tests {
         assert!(json.contains("2048"));
 
         let deserialized: DatasetFile = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.name, "test.csv");
+        assert_eq!(deserialized.name, file.name);
         assert_eq!(deserialized.size, 2048);
     }
 

@@ -402,14 +402,13 @@ static void JsonEach(DataChunk &args, ExpressionState &state, Vector &result) {
 }
 
 /**
- * @brief Implements the `gaggle_file_paths(dataset_path, filename)` SQL
+ * @brief Implements the `gaggle_file_path(dataset_path, filename)` SQL
  * function.
  */
 static void GetFilePath(DataChunk &args, ExpressionState &state,
                         Vector &result) {
   if (args.ColumnCount() != 2) {
-    throw InvalidInputException("gaggle_file_paths(dataset_path, filename) "
-                                "expects exactly 2 arguments");
+    throw InvalidInputException("gaggle_file_path(dataset_path, filename) expects exactly 2 arguments");
   }
   if (args.size() == 0) {
     return;
@@ -511,11 +510,28 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
       pattern.find('*') != string::npos || pattern.find('?') != string::npos;
   bool is_dir = pattern.empty();
 
+  auto decide_reader = [](const string &lower_ext) -> string {
+    if (StringUtil::EndsWith(lower_ext, ".parquet") ||
+        StringUtil::EndsWith(lower_ext, ".parq")) {
+      return "read_parquet";
+    }
+    if (StringUtil::EndsWith(lower_ext, ".json") ||
+        StringUtil::EndsWith(lower_ext, ".jsonl") ||
+        StringUtil::EndsWith(lower_ext, ".ndjson")) {
+      return "read_json_auto";
+    }
+    if (StringUtil::EndsWith(lower_ext, ".xlsx")) {
+      return "read_excel";
+    }
+    // Default CSV/TSV and others to DuckDB's auto CSV reader
+    return "read_csv_auto";
+  };
+
   if (is_dir || has_wildcard) {
     // Ensure dataset is downloaded and construct a glob path
     char *dir_c = gaggle_download_dataset(dataset_path.c_str());
     if (!dir_c) {
-      return nullptr;
+      throw InvalidInputException("Failed to prepare dataset directory: " + GetGaggleError());
     }
     string dir_path(dir_c);
     gaggle_free(dir_c);
@@ -525,10 +541,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
     local_path = dir_path + tail;
 
     // Choose reader based on pattern extension if any
-    if (StringUtil::EndsWith(lower_pat, ".parquet") ||
-        StringUtil::EndsWith(lower_pat, ".parq")) {
-      func_name = "read_parquet";
-    }
+    func_name = decide_reader(lower_pat);
   } else {
     // Specific file: resolve exact path
     char *file_path_c =
@@ -538,7 +551,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
       // dataset root
       char *dir_c = gaggle_download_dataset(dataset_path.c_str());
       if (!dir_c) {
-        return nullptr;
+        throw InvalidInputException("Failed to download dataset for pattern resolution: " + GetGaggleError());
       }
       string dir_path(dir_c);
       gaggle_free(dir_c);
@@ -551,10 +564,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
 
     // Decide reader based on extension
     auto lower_name = StringUtil::Lower(pattern);
-    if (StringUtil::EndsWith(lower_name, ".parquet") ||
-        StringUtil::EndsWith(lower_name, ".parq")) {
-      func_name = "read_parquet";
-    }
+    func_name = decide_reader(lower_name);
   }
 
   // Construct a table function call: func_name(local_path)
@@ -650,85 +660,61 @@ static void GaggleLsFunction(ClientContext &context, TableFunctionInput &data_p,
  * @brief Registers all the Gaggle functions with DuckDB.
  */
 static void LoadInternal(ExtensionLoader &loader) {
-  // Scalar functions (public)
+   // Scalar functions (public)
   loader.RegisterFunction(ScalarFunction(
-      "gaggle_set_credentials", {LogicalType::VARCHAR, LogicalType::VARCHAR},
-      LogicalType::BOOLEAN, SetCredentials));
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_download", {LogicalType::VARCHAR},
-                     LogicalType::VARCHAR, DownloadDataset));
+       "gaggle_set_credentials", {LogicalType::VARCHAR, LogicalType::VARCHAR},
+       LogicalType::BOOLEAN, SetCredentials));
   loader.RegisterFunction(ScalarFunction(
-      "gaggle_search",
-      {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER},
-      LogicalType::VARCHAR, SearchDatasets));
-  loader.RegisterFunction(ScalarFunction("gaggle_info", {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, GetDatasetInfo));
-  // Single canonical version endpoint
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_version", {}, LogicalType::VARCHAR, GetVersion));
-  loader.RegisterFunction(ScalarFunction("gaggle_purge_cache", {},
-                                         LogicalType::BOOLEAN, ClearCache));
-  loader.RegisterFunction(ScalarFunction("gaggle_cache_info", {},
-                                         LogicalType::VARCHAR, GetCacheInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_enforce_cache_limit", {},
-                                         LogicalType::BOOLEAN,
-                                         EnforceCacheLimit));
-  loader.RegisterFunction(ScalarFunction("gaggle_is_current",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::BOOLEAN,
-                                         IsDatasetCurrent));
-  loader.RegisterFunction(ScalarFunction("gaggle_update_dataset",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, UpdateDataset));
-  loader.RegisterFunction(ScalarFunction("gaggle_version_info",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR,
-                                         GetDatasetVersionInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_json_each",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, JsonEach));
+      "gaggle_download", {LogicalType::VARCHAR}, LogicalType::VARCHAR, DownloadDataset));
   loader.RegisterFunction(ScalarFunction(
-      "gaggle_file_paths", {LogicalType::VARCHAR, LogicalType::VARCHAR},
-      LogicalType::VARCHAR, GetFilePath));
+       "gaggle_search",
+       {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER},
+       LogicalType::VARCHAR, SearchDatasets));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR, GetDatasetInfo));
+   // Single canonical version endpoint
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_version", {}, LogicalType::VARCHAR, GetVersion));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_clear_cache", {}, LogicalType::BOOLEAN, ClearCache));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_cache_info", {}, LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_enforce_cache_limit", {}, LogicalType::BOOLEAN, EnforceCacheLimit));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_is_current", {LogicalType::VARCHAR}, LogicalType::BOOLEAN, IsDatasetCurrent));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_update_dataset", {LogicalType::VARCHAR}, LogicalType::VARCHAR, UpdateDataset));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_version_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR, GetDatasetVersionInfo));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_json_each", {LogicalType::VARCHAR}, LogicalType::VARCHAR, JsonEach));
+  loader.RegisterFunction(ScalarFunction(
+      "gaggle_file_path", {LogicalType::VARCHAR, LogicalType::VARCHAR}, LogicalType::VARCHAR, GetFilePath));
 
-  // Table function: gaggle_ls(dataset_path) -> name,size,path
+   // Table function: gaggle_ls(dataset_path) -> name,size,path
   TableFunction ls_fun("gaggle_ls", {LogicalType::VARCHAR}, GaggleLsFunction,
                        GaggleLsBind, GaggleLsInitGlobal, nullptr);
   loader.RegisterFunction(ls_fun);
 
-  // Register replacement scan for "kaggle:" prefix via DBConfig
+   // Register replacement scan for "kaggle:" prefix via DBConfig
   auto &db = loader.GetDatabaseInstance();
   auto &config = DBConfig::GetConfig(db);
-  config.replacement_scans.insert(config.replacement_scans.begin(),
-                                  ReplacementScan(KaggleReplacementScan));
-}
+   config.replacement_scans.insert(config.replacement_scans.begin(),
+                                   ReplacementScan(KaggleReplacementScan));
+ }
 
-// Define C++ extension entrypoint for dynamic loading
-DUCKDB_CPP_EXTENSION_ENTRY(gaggle, loader) { duckdb::LoadInternal(loader); }
+DUCKDB_CPP_EXTENSION_ENTRY(gaggle, loader) { LoadInternal(loader); }
 
-void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
-std::string GaggleExtension::Name() { return "gaggle"; }
-std::string GaggleExtension::Version() const {
-  // Return a static-safe version string to avoid calling into FFI at load time
-  return std::string("v0.1.0");
-}
+ void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
+  std::string GaggleExtension::Name() { return "gaggle"; }
+  std::string GaggleExtension::Version() const {
+    // Return a static-safe version string to avoid calling into FFI at load time
+    return std::string("v0.1.0");
+  }
 
 } // namespace duckdb
 
 extern "C" {
-DUCKDB_EXTENSION_API void gaggle_init(duckdb::DatabaseInstance &db) {
-  duckdb::ExtensionLoader loader(db, "gaggle");
-  duckdb::LoadInternal(loader);
-}
-
-// Alias expected by some loaders/tests when loading C++ extensions by file path
-DUCKDB_EXTENSION_API void gaggle_duckdb_cpp_init(duckdb::DatabaseInstance &db) {
-  gaggle_init(db);
-}
-
-// Optional version symbol for compatibility
-DUCKDB_EXTENSION_API const char *gaggle_version() {
-  // Return a static-safe version string; the SQL gaggle_version() fetches from Rust at runtime
-  return "v0.1.0";
-}
+DUCKDB_CPP_EXTENSION_ENTRY(gaggle, loader) { duckdb::LoadInternal(loader); }
 }

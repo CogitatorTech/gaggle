@@ -454,8 +454,19 @@ pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char
 pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
     let cache_dir = crate::config::cache_dir_runtime();
 
-    let size_bytes = calculate_dir_size(&cache_dir).unwrap_or(0);
-    let size_mb = size_bytes / (1024 * 1024);
+    // Prefer fast metadata-based computation when possible
+    let size_mb_meta = crate::kaggle::download::get_total_cache_size_mb().unwrap_or(0);
+
+    // Determine size in bytes and MB
+    let (size_bytes, size_mb) = if size_mb_meta > 0 {
+        let bytes = size_mb_meta.saturating_mul(1024 * 1024);
+        (bytes, size_mb_meta)
+    } else {
+        match crate::utils::calculate_dir_size(&cache_dir) {
+            Ok(bytes) => (bytes, bytes / (1024 * 1024)),
+            Err(_) => (0, 0),
+        }
+    };
 
     let limit_mb = crate::config::cache_size_limit_mb();
     let is_soft_limit = crate::config::cache_limit_is_soft();
@@ -472,7 +483,8 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
 
     let info = json!({
         "path": cache_dir.to_string_lossy(),
-        "size_mb": size_mb,
+        "size_bytes": size_bytes,
+        "size_mb": size_mb, // MiB (1024*1024)
         "limit_mb": limit_mb,
         "usage_percent": usage_percent,
         "is_soft_limit": is_soft_limit,
@@ -544,22 +556,6 @@ pub(crate) fn string_to_c_string(s: String) -> *mut c_char {
             std::ptr::null_mut()
         }
     }
-}
-
-fn calculate_dir_size(path: &std::path::Path) -> Result<u64, std::io::Error> {
-    let mut total = 0;
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let metadata = entry.metadata()?;
-            if metadata.is_dir() {
-                total += calculate_dir_size(&entry.path())?;
-            } else {
-                total += metadata.len();
-            }
-        }
-    }
-    Ok(total)
 }
 
 /// Helper function to recursively expand JSON values
@@ -829,7 +825,7 @@ mod tests {
     #[test]
     fn test_calculate_dir_size_empty_dir() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let size = calculate_dir_size(temp_dir.path()).unwrap();
+        let size = crate::utils::calculate_dir_size(temp_dir.path()).unwrap();
         assert_eq!(size, 0);
     }
 
@@ -839,7 +835,7 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "hello").unwrap();
 
-        let size = calculate_dir_size(temp_dir.path()).unwrap();
+        let size = crate::utils::calculate_dir_size(temp_dir.path()).unwrap();
         assert!(size > 0);
     }
 
@@ -851,7 +847,7 @@ mod tests {
         let test_file = subdir.join("test.txt");
         fs::write(&test_file, "hello").unwrap();
 
-        let size = calculate_dir_size(temp_dir.path()).unwrap();
+        let size = crate::utils::calculate_dir_size(temp_dir.path()).unwrap();
         assert!(size > 0);
     }
 
@@ -943,6 +939,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_gaggle_clear_cache_uses_runtime_env() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());

@@ -22,6 +22,9 @@ reqwest = { version = "0.12", features = ["blocking", "rustls-tls", "json", "mul
 zip = "6.0"
 dirs = "6.0"
 urlencoding = "2.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+atty = "0.2"
 
 [dev-dependencies]
 tempfile = "3.10"

@@ -19,6 +19,12 @@ pub struct GaggleConfig {
     /// HTTP timeout in seconds
     #[allow(dead_code)]
     pub http_timeout_secs: u64,
+    /// Download lock wait timeout in milliseconds
+    #[allow(dead_code)]
+    pub download_wait_timeout_ms: u64,
+    /// Download lock poll interval in milliseconds
+    #[allow(dead_code)]
+    pub download_wait_poll_ms: u64,
     // Future: other options
 }
 
@@ -29,6 +35,8 @@ impl GaggleConfig {
             cache_dir: Self::get_cache_dir(),
             verbose_logging: Self::get_verbose(),
             http_timeout_secs: Self::get_http_timeout(),
+            download_wait_timeout_ms: Self::get_download_wait_timeout_ms(),
+            download_wait_poll_ms: Self::get_download_wait_poll_ms(),
         }
     }
 
@@ -64,6 +72,22 @@ impl GaggleConfig {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(30)
+    }
+
+    /// Get download wait timeout from env (default 30_000 ms)
+    fn get_download_wait_timeout_ms() -> u64 {
+        env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30_000)
+    }
+
+    /// Get download wait poll interval from env (default 100 ms)
+    fn get_download_wait_poll_ms() -> u64 {
+        env::var("GAGGLE_DOWNLOAD_WAIT_POLL_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(100)
     }
 }
 
@@ -147,11 +171,32 @@ pub fn cache_size_limit_mb() -> Option<u64> {
 pub fn cache_limit_is_soft() -> bool {
     env::var("GAGGLE_CACHE_HARD_LIMIT")
         .ok()
-        .map(|v| match v.to_lowercase().as_str() {
-            "true" | "yes" | "1" => false, // Hard limit
-            _ => true,                     // Soft limit (default)
-        })
+        .map(|v| !matches!(v.to_lowercase().as_str(), "true" | "yes" | "1"))
         .unwrap_or(true)
+}
+
+/// Runtime-resolved download wait timeout in milliseconds
+pub fn download_wait_timeout_ms() -> u64 {
+    env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(CONFIG.download_wait_timeout_ms)
+}
+
+/// Runtime-resolved download wait poll interval in milliseconds
+pub fn download_wait_poll_interval_ms() -> u64 {
+    env::var("GAGGLE_DOWNLOAD_WAIT_POLL_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(CONFIG.download_wait_poll_ms)
+}
+
+/// Whether offline mode is enabled (disables network operations)j Controlled by GAGGLE_OFFLINE
+pub fn offline_mode() -> bool {
+    std::env::var("GAGGLE_OFFLINE")
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -165,6 +210,8 @@ mod tests {
         let config = GaggleConfig::default();
         assert!(!config.verbose_logging);
         assert_eq!(config.http_timeout_secs, 30);
+        assert!(config.download_wait_timeout_ms >= 1000);
+        assert!(config.download_wait_poll_ms > 0);
     }
 
     #[test]
@@ -452,5 +499,30 @@ mod tests {
         env::set_var("GAGGLE_CACHE_HARD_LIMIT", "true");
         assert!(!cache_limit_is_soft());
         env::remove_var("GAGGLE_CACHE_HARD_LIMIT");
+    }
+
+    #[test]
+    #[serial]
+    fn test_download_wait_runtime_overrides() {
+        env::set_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS", "1234");
+        env::set_var("GAGGLE_DOWNLOAD_WAIT_POLL_MS", "17");
+        assert_eq!(download_wait_timeout_ms(), 1234);
+        assert_eq!(download_wait_poll_interval_ms(), 17);
+        env::remove_var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS");
+        env::remove_var("GAGGLE_DOWNLOAD_WAIT_POLL_MS");
+    }
+
+    #[test]
+    #[serial]
+    fn test_offline_mode_env_parsing() {
+        std::env::remove_var("GAGGLE_OFFLINE");
+        assert!(!offline_mode());
+        std::env::set_var("GAGGLE_OFFLINE", "1");
+        assert!(offline_mode());
+        std::env::set_var("GAGGLE_OFFLINE", "true");
+        assert!(offline_mode());
+        std::env::set_var("GAGGLE_OFFLINE", "no");
+        assert!(!offline_mode());
+        std::env::remove_var("GAGGLE_OFFLINE");
     }
 }

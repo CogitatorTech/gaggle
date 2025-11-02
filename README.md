@@ -20,22 +20,26 @@ Kaggle Datasets for DuckDB
 
 Gaggle is a DuckDB extension that allows you to work with Kaggle datasets directly in SQL queries, as if
 they were DuckDB tables.
-It is written in Rust and uses the official Kaggle API to search, download, and manage datasets.
+It is written in Rust and uses the Kaggle API to search, download, and manage datasets.
 
-Kaggle hosts a large collection of very useful datasets for data science and machine learning work.
-Accessing these datasets typically involves multiple steps including manually downloading a dataset (as a ZIP file),
+Kaggle hosts a large collection of very useful datasets for data science and machine learning.
+Accessing these datasets typically involves manually downloading a dataset (as a ZIP file),
 extracting it, loading the files in the dataset into your data science environment, and managing storage and dataset
 updates, etc.
-This workflow can be a at time.
-Gaggle tries to help simplify this process by integrating Kaggle dataset access directly into DuckDB.
+This workflow can be become complex, especially when working with multiple datasets or when datasets are updated
+frequently.
+Gaggle tries to help simplify this process by hiding the complexity and letting you work with datasets directly inside
+an analytical database like DuckDB that can handle fast queries.
+In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 
 ### Features
 
-- Has a simple API (just a handful of SQL functions)
-- Allows you search, download, update, and delete Kaggle datasets directly from DuckDB
-- Supports datasets made of CSV, JSON, and Parquet files
+- Has a simple API to interact with Kaggle datasets from DuckDB
+- Allows you to search, download, and read datasets from Kaggle
+- Supports datasets that contain CSV, Parquet, JSON, and XLSX files (XLSX requires DuckDB's Excel reader to be available in your DuckDB build)
 - Configurable and has built-in caching support
-- Thread-safe and memory-efficient
+- Thread-safe, fast, and has a low memory footprint
+- Supports dataset versioning and update checks
 
 See the [ROADMAP.md](ROADMAP.md) for planned features and the [docs](docs) folder for detailed documentation.
 
@@ -88,27 +92,26 @@ make release
 #### Trying Gaggle
 
 ```sql
--- Load the Gaggle extension
-load 'build/release/extension/gaggle/gaggle.duckdb_extension';
+-- Load the Gaggle extension (only needed if you built from source)
+--load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 
--- Set your Kaggle credentials (or use `~/.kaggle/kaggle.json`)
+-- Manually, set your Kaggle credentials (or use `~/.kaggle/kaggle.json`)
 select gaggle_set_credentials('your-username', 'your-api-key');
 
 -- Get extension version
 select gaggle_version();
 
--- Prime cache by downloading the dataset locally (optional, but improves first-time performance)
-select gaggle_download('habedi/flickr-8k-dataset-clean');
-
 -- List files in the downloaded dataset
+-- (Note that if the datasets is not downloaded yet, it will be downloaded and cached first)
 select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
--- Read a Parquet file from local cache using a prepared statement (no subquery in function args)
+-- Read a Parquet file from local cache using a prepared statement
+-- (Note that DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
 prepare rp as select * from read_parquet(?) limit 10;
-execute rp(gaggle_file_paths('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
+execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
--- Use the replacement scan to read directly via kaggle: URL
+-- Alternatively, we can use a replacement scan to read directly via `kaggle:` prefix
 select count(*)
 from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
 
@@ -116,74 +119,24 @@ from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
 select count(*)
 from 'kaggle:habedi/flickr-8k-dataset-clean/*.parquet';
 
--- Optionally, check cache info
+-- Optionally, we check cache info
 select gaggle_cache_info();
 
--- Enforce cache size limit manually (automatic with soft limit by default)
+-- Clear cache and enforce cache size limit manually
+select gaggle_clear_cache();
 select gaggle_enforce_cache_limit();
 
--- Check if cached dataset is current
+-- Check if cached dataset is current (is newest version?)
 select gaggle_is_current('habedi/flickr-8k-dataset-clean');
 
 -- Force update to latest version if needed
--- select gaggle_update_dataset('habedi/flickr-8k-dataset-clean');
+--select gaggle_update_dataset('habedi/flickr-8k-dataset-clean');
 
 -- Download specific version (version pinning for reproducibility)
--- select gaggle_download('habedi/flickr-8k-dataset-clean@v2');
+--select gaggle_download('habedi/flickr-8k-dataset-clean@v2');
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
-
----
-
-### Configuration
-
-Gaggle can be configured using environment variables:
-
-#### Cache Management
-
-```bash
-# Set cache size limit (default: 100GB = 102400 MB)
-export GAGGLE_CACHE_SIZE_LIMIT_MB=51200  # 50GB
-
-# Set unlimited cache
-export GAGGLE_CACHE_SIZE_LIMIT_MB=unlimited
-
-# Set cache directory (default: ~/.cache/gaggle_cache or platform-specific)
-export GAGGLE_CACHE_DIR=/path/to/cache
-
-# Enable hard limit mode (prevents downloads when limit reached, default: soft limit)
-export GAGGLE_CACHE_HARD_LIMIT=true
-```
-
-#### Network Configuration
-
-```bash
-# HTTP timeout in seconds (default: 30)
-export GAGGLE_HTTP_TIMEOUT=60
-
-# HTTP retry attempts (default: 3)
-export GAGGLE_HTTP_RETRY_ATTEMPTS=5
-
-# HTTP retry delay in milliseconds (default: 1000)
-export GAGGLE_HTTP_RETRY_DELAY_MS=500
-
-# HTTP retry max delay in milliseconds (default: 30000)
-export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=60000
-```
-
-#### Authentication
-
-```bash
-# Kaggle API credentials (alternative to ~/.kaggle/kaggle.json)
-export KAGGLE_USERNAME=your-username
-export KAGGLE_KEY=your-api-key
-```
-
-> [!TIP]
-> **Soft Limit (Default):** Downloads complete even if they exceed the cache limit, then oldest datasets are automatically evicted using LRU (Least Recently Used) policy until under limit.
->
-> **Hard Limit:** Would prevent downloads when limit is reached (not yet fully implemented).
 
 ---
 
@@ -196,6 +149,19 @@ Check out the [docs](docs/README.md) directory for the API documentation, how to
 Check out the [examples](docs/examples) directory for SQL scripts that show how to use Gaggle.
 
 ---
+
+### Configuration
+
+See [CONFIGURATION.md](docs/CONFIGURATION.md) for full details. Main environment variables:
+
+- `GAGGLE_CACHE_DIR` — cache directory path (default: `~/.cache/gaggle`)
+- `GAGGLE_HTTP_TIMEOUT` — HTTP timeout (in seconds)
+- `GAGGLE_HTTP_RETRY_ATTEMPTS` — retry attempts after the initial try
+- `GAGGLE_HTTP_RETRY_DELAY_MS` — initial backoff delay (in milliseconds)
+- `GAGGLE_HTTP_RETRY_MAX_DELAY_MS` — maximum backoff delay cap (in milliseconds)
+- `GAGGLE_LOG_LEVEL` — structured log level for the Rust core (like `INFO` or `DEBUG`)
+- `GAGGLE_OFFLINE` — disable network; only use cached data (downloads fail fast if not cached)
+- `KAGGLE_USERNAME`, `KAGGLE_KEY` — Kaggle credentials (alternative to the SQL call)
 
 ### Contributing
 

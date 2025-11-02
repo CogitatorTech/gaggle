@@ -16,6 +16,15 @@ pub struct DatasetInfo {
 
 /// Get metadata for a specific dataset
 pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, GaggleError> {
+    if crate::config::offline_mode() {
+        return Err(GaggleError::HttpRequestError(
+            format!(
+                "Offline mode enabled; metadata fetch for '{}' is disabled. Unset GAGGLE_OFFLINE to enable network.",
+                dataset_path
+            ),
+        ));
+    }
+
     let creds = get_credentials()?;
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
 
@@ -43,6 +52,27 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
 
 /// Get current version number of a dataset from Kaggle API
 pub fn get_current_version(dataset_path: &str) -> Result<String, GaggleError> {
+    if crate::config::offline_mode() {
+        // In offline mode, try to use cached marker file version if available
+        let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+        let cache_dir = crate::config::cache_dir_runtime()
+            .join("datasets")
+            .join(&owner)
+            .join(&dataset);
+        let marker = cache_dir.join(".downloaded");
+        if let Ok(content) = std::fs::read_to_string(&marker) {
+            if !content.is_empty() {
+                if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = meta.get("version").and_then(|x| x.as_str()) {
+                        return Ok(v.to_string());
+                    }
+                }
+            }
+        }
+        // Fallback when no cached version is available
+        return Ok("unknown".to_string());
+    }
+
     let metadata = get_dataset_metadata(dataset_path)?;
 
     // Try to extract version from metadata

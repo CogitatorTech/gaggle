@@ -11,10 +11,10 @@ load 'build/release/extension/gaggle/gaggle.duckdb_extension'
 
 # Test 1: Purge cache multiple times (idempotent operation)
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 # Test 2: Set credentials multiple times (should overwrite)
 statement ok
@@ -42,7 +42,7 @@ VARCHAR
 
 # Test 5: Operations should be repeatable and safe
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 statement ok
 select gaggle_cache_info()
@@ -52,7 +52,7 @@ select gaggle_version()
 
 # Test 6: Verify boolean return from operations
 query I
-select gaggle_purge_cache() = true or gaggle_purge_cache() = 1
+select gaggle_clear_cache() = true or gaggle_clear_cache() = 1
 ----
 1
 

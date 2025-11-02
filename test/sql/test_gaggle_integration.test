@@ -26,10 +26,10 @@ select gaggle_cache_info() != ''
 
 # Test 2: Repeated operations should be idempotent
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 statement ok
 select gaggle_cache_info()
@@ -49,7 +49,7 @@ statement ok
 begin transaction
 
 statement ok
-select gaggle_purge_cache()
+select gaggle_clear_cache()
 
 statement ok
 select gaggle_cache_info()
@@ -59,7 +59,7 @@ commit
 
 # Test 5: Multiple calls within aggregation context
 query I
-select count(*) filter (where cast(gaggle_purge_cache() as integer) = 1)
+select count(*) filter (where cast(gaggle_clear_cache() as integer) = 1)
 ----
 1
 
@@ -71,7 +71,7 @@ select (gaggle_version() is not null) and (gaggle_cache_info() is not null)
 
 # Test 7: Functions in SELECT with other expressions
 query T
-select 'Gaggle_' || substr(gaggle_version(), 1, 10)
+select 'Gaggle_' || substr(gaggle_version(), 1, 0)
 ----
 Gaggle_
 

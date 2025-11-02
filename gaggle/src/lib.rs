@@ -2,8 +2,8 @@ mod config;
 mod error;
 mod ffi;
 mod kaggle;
+mod utils;
 
-// Re-export error some of the functions to use them internally
 pub use error::{gaggle_clear_last_error, gaggle_last_error};
 pub use ffi::{
     gaggle_clear_cache, gaggle_dataset_version_info, gaggle_download_dataset,
@@ -13,3 +13,23 @@ pub use ffi::{
 };
 pub use kaggle::parse_dataset_path;
 pub use kaggle::parse_dataset_path_with_version;
+
+use once_cell::sync::OnceCell;
+use tracing_subscriber::{fmt, EnvFilter};
+
+static LOG_INIT: OnceCell<()> = OnceCell::new();
+
+/// Initialize global logging based on GAGGLE_LOG_LEVEL.
+/// Safe to call multiple times; only the first call has an effect.
+pub fn init_logging() {
+    let _ = LOG_INIT.get_or_init(|| {
+        let level = std::env::var("GAGGLE_LOG_LEVEL").unwrap_or_else(|_| "WARN".to_string());
+        let filter = EnvFilter::try_new(level).unwrap_or_else(|_| EnvFilter::new("WARN"));
+        fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .with_level(true)
+            .with_ansi(atty::is(atty::Stream::Stderr))
+            .init();
+    });
+}

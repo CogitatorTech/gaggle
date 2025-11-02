@@ -22,7 +22,8 @@ Gaggle supports configuration via environment variables to customize its behavio
 - **Type**: Integer (megabytes) or "unlimited"
 - **Default**: `102400` (100GB)
 - **Status**: ✅ Implemented
-- **Behavior**: Uses soft limit by default - downloads complete even if they exceed the limit, then oldest datasets are automatically evicted using LRU (Least Recently Used) policy
+- **Behavior**: Uses soft limit by default - downloads complete even if they exceed the limit, then oldest datasets are
+  automatically evicted using LRU (Least Recently Used) policy
 - **Example**:
   ```bash
   # Set to 50GB
@@ -73,19 +74,41 @@ Gaggle supports configuration via environment variables to customize its behavio
 ##### HTTP Retry Controls
 
 - **GAGGLE_HTTP_RETRY_ATTEMPTS**
-  - **Description**: Number of retry attempts after the initial try
-  - **Type**: Integer
-  - **Default**: `3`
+    - **Description**: Number of retry attempts after the initial try
+    - **Type**: Integer
+    - **Default**: `3`
 - **GAGGLE_HTTP_RETRY_DELAY_MS**
-  - **Description**: Initial backoff delay in milliseconds
-  - **Type**: Integer (ms)
-  - **Default**: `1000`
+    - **Description**: Initial backoff delay in milliseconds
+    - **Type**: Integer (ms)
+    - **Default**: `1000`
 - **GAGGLE_HTTP_RETRY_MAX_DELAY_MS**
-  - **Description**: Maximum backoff delay cap in milliseconds
-  - **Type**: Integer (ms)
-  - **Default**: `30000`
+    - **Description**: Maximum backoff delay cap in milliseconds
+    - **Type**: Integer (ms)
+    - **Default**: `30000`
 
   These controls enable exponential backoff with cap across metadata/search/download requests.
+
+#### Download Coordination
+
+When multiple queries attempt to download the same dataset concurrently, Gaggle coordinates using an in-process lock.
+These settings control the wait behavior when a download is already in progress.
+
+- **GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS**
+  - **Description**: Maximum time a waiting request will block for a concurrent download to finish
+  - **Type**: Integer (milliseconds)
+  - **Default**: `30000` (30 seconds)
+  - **Example**:
+    ```bash
+    export GAGGLE_DOWNLOAD_WAIT_TIMEOUT_MS=600000 # 10 minutes
+    ```
+- **GAGGLE_DOWNLOAD_WAIT_POLL_MS**
+  - **Description**: Polling interval while waiting on another download
+  - **Type**: Integer (milliseconds)
+  - **Default**: `100`
+  - **Example**:
+    ```bash
+    export GAGGLE_DOWNLOAD_WAIT_POLL_MS=250
+    ```
 
 #### Logging Configuration
 
@@ -99,23 +122,35 @@ Gaggle supports configuration via environment variables to customize its behavio
   export GAGGLE_VERBOSE=1
   ```
 
-##### GAGGLE_LOG_LEVEL (planned)
+##### GAGGLE_LOG_LEVEL
 
-- **Description**: Set logging level for detailed output
-- **Type**: String (`ERROR`, `WARN`, `INFO`, `DEBUG`)
+- **Description**: Set logging level for structured logs emitted by the Rust core (via `tracing`)
+- **Type**: String (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`); case-insensitive
 - **Default**: `WARN`
-- **Status**: Planned, not implemented yet
+- **Status**: ✅ Implemented
 - **Example**:
   ```bash
-  ## Show all messages including debug
-  export GAGGLE_LOG_LEVEL=DEBUG
-
-  ## Show only errors
-  export GAGGLE_LOG_LEVEL=ERROR
-
-  ## Show informational messages and above
   export GAGGLE_LOG_LEVEL=INFO
   ```
+
+  Notes:
+  - Logging is initialized lazily on first use (when the crate is loaded in-process or when `gaggle::init_logging()` is called). The environment variable is read once per process.
+  - Logs include a level prefix and optional ANSI colors if stderr is a terminal.
+
+#### Offline Mode
+
+- **GAGGLE_OFFLINE**
+  - **Description**: Disable network access. When enabled, operations that require network will fail fast unless data is already cached.
+  - **Type**: Boolean (`1`, `true`, `yes`, `on` to enable)
+  - **Default**: `false`
+  - **Effects**:
+    - gaggle_download(...) fails if the dataset isn’t cached.
+    - Version checks use cached `.downloaded` metadata when available; otherwise return "unknown".
+    - Search and metadata calls will still attempt network; consider avoiding them in offline mode.
+  - **Example**:
+    ```bash
+    export GAGGLE_OFFLINE=1
+    ```
 
 ### Usage Examples
 
@@ -186,6 +221,19 @@ export GAGGLE_HTTP_RETRY_DELAY_MS=5000      ## 5 second initial delay
 export GAGGLE_HTTP_RETRY_MAX_DELAY_MS=60000 ## Cap at 60s
 
 ./build/release/duckdb
+```
+
+#### Example 6: Offline Mode
+
+```bash
+# Enable offline mode
+export GAGGLE_OFFLINE=1
+
+# Attempt to download a dataset (will fail if not cached)
+gaggle download username/dataset-name
+
+# Querying metadata or searching will still attempt network access
+gaggle info username/dataset-name
 ```
 
 ### Configuration Verification

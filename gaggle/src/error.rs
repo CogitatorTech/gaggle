@@ -3,39 +3,128 @@ use std::ffi::{c_char, CString};
 use std::str::Utf8Error as StdUtf8Error;
 use thiserror::Error;
 
+/// Error codes for programmatic error handling
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
+pub enum ErrorCode {
+    /// E001: Invalid or missing Kaggle API credentials
+    E001_InvalidCredentials,
+    /// E002: Requested dataset not found on Kaggle
+    E002_DatasetNotFound,
+    /// E003: HTTP/Network error during API request
+    E003_NetworkError,
+    /// E004: Invalid dataset path format
+    E004_InvalidPath,
+    /// E005: File system I/O error
+    E005_IoError,
+    /// E006: JSON serialization/deserialization error
+    E006_JsonError,
+    /// E007: ZIP file extraction or validation error
+    E007_ZipError,
+    /// E008: CSV parsing error
+    E008_CsvError,
+    /// E009: Invalid UTF-8 string in FFI boundary
+    E009_Utf8Error,
+    /// E010: Null pointer passed to FFI function
+    E010_NullPointer,
+}
+
+impl ErrorCode {
+    /// Get the numeric error code as a string
+    pub fn code(&self) -> &'static str {
+        match self {
+            ErrorCode::E001_InvalidCredentials => "E001",
+            ErrorCode::E002_DatasetNotFound => "E002",
+            ErrorCode::E003_NetworkError => "E003",
+            ErrorCode::E004_InvalidPath => "E004",
+            ErrorCode::E005_IoError => "E005",
+            ErrorCode::E006_JsonError => "E006",
+            ErrorCode::E007_ZipError => "E007",
+            ErrorCode::E008_CsvError => "E008",
+            ErrorCode::E009_Utf8Error => "E009",
+            ErrorCode::E010_NullPointer => "E010",
+        }
+    }
+
+    /// Get a short description of the error
+    pub fn description(&self) -> &'static str {
+        match self {
+            ErrorCode::E001_InvalidCredentials => "Invalid Kaggle credentials",
+            ErrorCode::E002_DatasetNotFound => "Dataset not found",
+            ErrorCode::E003_NetworkError => "Network error",
+            ErrorCode::E004_InvalidPath => "Invalid dataset path",
+            ErrorCode::E005_IoError => "File system error",
+            ErrorCode::E006_JsonError => "JSON error",
+            ErrorCode::E007_ZipError => "ZIP extraction error",
+            ErrorCode::E008_CsvError => "CSV parsing error",
+            ErrorCode::E009_Utf8Error => "UTF-8 encoding error",
+            ErrorCode::E010_NullPointer => "Null pointer error",
+        }
+    }
+}
+
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.code(), self.description())
+    }
+}
+
 #[derive(Error, Debug)]
 #[allow(dead_code)]
 pub enum GaggleError {
     /// Error indicating that a requested dataset could not be found.
-    #[error("Dataset not found: {0}")]
+    #[error("[E002] Dataset not found: {0}")]
     DatasetNotFound(String),
     /// Error for when a C string from the FFI boundary is not valid UTF-8.
-    #[error("Invalid UTF-8 string")]
+    #[error("[E009] Invalid UTF-8 string")]
     Utf8Error,
     /// Error for when a null pointer is passed as an argument to an FFI function.
-    #[error("Null pointer passed")]
+    #[error("[E010] Null pointer passed")]
     NullPointer,
     /// An I/O error that occurred while reading/writing files.
-    #[error("IO error: {0}")]
+    #[error("[E005] IO error: {0}")]
     IoError(String),
     /// An error during the serialization or deserialization of JSON data.
-    #[error("JSON serialization error: {0}")]
+    #[error("[E006] JSON serialization error: {0}")]
     JsonError(String),
     /// An error that occurred during an HTTP request to Kaggle API.
-    #[error("HTTP request failed: {0}")]
+    #[error("[E003] HTTP request failed: {0}")]
     HttpRequestError(String),
     /// Error for invalid Kaggle API credentials.
-    #[error("Invalid Kaggle credentials: {0}")]
+    #[error("[E001] Invalid Kaggle credentials: {0}")]
     CredentialsError(String),
     /// Error for invalid dataset path format.
-    #[error("Invalid dataset path: {0}")]
+    #[error("[E004] Invalid dataset path: {0}")]
     InvalidDatasetPath(String),
     /// Error during ZIP extraction.
-    #[error("ZIP extraction failed: {0}")]
+    #[error("[E007] ZIP extraction failed: {0}")]
     ZipError(String),
     /// Error during CSV parsing.
-    #[error("CSV parsing error: {0}")]
+    #[error("[E008] CSV parsing error: {0}")]
     CsvError(String),
+}
+
+impl GaggleError {
+    /// Get the error code for this error
+    pub fn code(&self) -> ErrorCode {
+        match self {
+            GaggleError::DatasetNotFound(_) => ErrorCode::E002_DatasetNotFound,
+            GaggleError::Utf8Error => ErrorCode::E009_Utf8Error,
+            GaggleError::NullPointer => ErrorCode::E010_NullPointer,
+            GaggleError::IoError(_) => ErrorCode::E005_IoError,
+            GaggleError::JsonError(_) => ErrorCode::E006_JsonError,
+            GaggleError::HttpRequestError(_) => ErrorCode::E003_NetworkError,
+            GaggleError::CredentialsError(_) => ErrorCode::E001_InvalidCredentials,
+            GaggleError::InvalidDatasetPath(_) => ErrorCode::E004_InvalidPath,
+            GaggleError::ZipError(_) => ErrorCode::E007_ZipError,
+            GaggleError::CsvError(_) => ErrorCode::E008_CsvError,
+        }
+    }
+
+    /// Get the numeric error code as a string
+    pub fn code_str(&self) -> &'static str {
+        self.code().code()
+    }
 }
 
 impl From<StdUtf8Error> for GaggleError {
@@ -122,64 +211,135 @@ mod tests {
     #[test]
     fn test_dataset_not_found_error() {
         let err = GaggleError::DatasetNotFound("test/dataset".to_string());
-        assert_eq!(err.to_string(), "Dataset not found: test/dataset");
+        let msg = err.to_string();
+        assert!(msg.contains("[E002]"));
+        assert!(msg.contains("test/dataset"));
     }
 
     #[test]
     fn test_utf8_error() {
         let err = GaggleError::Utf8Error;
-        assert_eq!(err.to_string(), "Invalid UTF-8 string");
+        let msg = err.to_string();
+        assert!(msg.contains("[E009]"));
+        assert!(msg.contains("Invalid UTF-8"));
     }
 
     #[test]
     fn test_null_pointer_error() {
         let err = GaggleError::NullPointer;
-        assert_eq!(err.to_string(), "Null pointer passed");
+        let msg = err.to_string();
+        assert!(msg.contains("[E010]"));
+        assert!(msg.contains("Null pointer"));
     }
 
     #[test]
     fn test_io_error() {
         let err = GaggleError::IoError("file not found".to_string());
-        assert_eq!(err.to_string(), "IO error: file not found");
+        let msg = err.to_string();
+        assert!(msg.contains("[E005]"));
+        assert!(msg.contains("file not found"));
     }
 
     #[test]
     fn test_json_error() {
         let err = GaggleError::JsonError("invalid json".to_string());
-        assert_eq!(err.to_string(), "JSON serialization error: invalid json");
+        let msg = err.to_string();
+        assert!(msg.contains("[E006]"));
+        assert!(msg.contains("invalid json"));
+    }
+
+    #[test]
+    fn test_error_code_enum() {
+        let err = GaggleError::CredentialsError("test".to_string());
+        assert_eq!(err.code(), ErrorCode::E001_InvalidCredentials);
+        assert_eq!(err.code_str(), "E001");
+    }
+
+    #[test]
+    fn test_error_code_display() {
+        let code = ErrorCode::E001_InvalidCredentials;
+        let display = format!("{}", code);
+        assert!(display.contains("E001"));
+        assert!(display.contains("Invalid Kaggle credentials"));
+    }
+
+    #[test]
+    fn test_all_error_codes() {
+        // Verify all error variants have correct codes
+        assert_eq!(
+            GaggleError::DatasetNotFound("".into()).code(),
+            ErrorCode::E002_DatasetNotFound
+        );
+        assert_eq!(GaggleError::Utf8Error.code(), ErrorCode::E009_Utf8Error);
+        assert_eq!(GaggleError::NullPointer.code(), ErrorCode::E010_NullPointer);
+        assert_eq!(
+            GaggleError::IoError("".into()).code(),
+            ErrorCode::E005_IoError
+        );
+        assert_eq!(
+            GaggleError::JsonError("".into()).code(),
+            ErrorCode::E006_JsonError
+        );
+        assert_eq!(
+            GaggleError::HttpRequestError("".into()).code(),
+            ErrorCode::E003_NetworkError
+        );
+        assert_eq!(
+            GaggleError::CredentialsError("".into()).code(),
+            ErrorCode::E001_InvalidCredentials
+        );
+        assert_eq!(
+            GaggleError::InvalidDatasetPath("".into()).code(),
+            ErrorCode::E004_InvalidPath
+        );
+        assert_eq!(
+            GaggleError::ZipError("".into()).code(),
+            ErrorCode::E007_ZipError
+        );
+        assert_eq!(
+            GaggleError::CsvError("".into()).code(),
+            ErrorCode::E008_CsvError
+        );
     }
 
     #[test]
     fn test_http_request_error() {
         let err = GaggleError::HttpRequestError("connection timeout".to_string());
-        assert_eq!(err.to_string(), "HTTP request failed: connection timeout");
+        let msg = err.to_string();
+        assert!(msg.contains("[E003]"));
+        assert!(msg.contains("connection timeout"));
     }
 
     #[test]
     fn test_credentials_error() {
         let err = GaggleError::CredentialsError("invalid credentials".to_string());
-        assert_eq!(
-            err.to_string(),
-            "Invalid Kaggle credentials: invalid credentials"
-        );
+        let msg = err.to_string();
+        assert!(msg.contains("[E001]"));
+        assert!(msg.contains("invalid credentials"));
     }
 
     #[test]
     fn test_invalid_dataset_path_error() {
         let err = GaggleError::InvalidDatasetPath("bad/path/format".to_string());
-        assert_eq!(err.to_string(), "Invalid dataset path: bad/path/format");
+        let msg = err.to_string();
+        assert!(msg.contains("[E004]"));
+        assert!(msg.contains("bad/path/format"));
     }
 
     #[test]
     fn test_zip_error() {
         let err = GaggleError::ZipError("corrupted zip file".to_string());
-        assert_eq!(err.to_string(), "ZIP extraction failed: corrupted zip file");
+        let msg = err.to_string();
+        assert!(msg.contains("[E007]"));
+        assert!(msg.contains("corrupted zip file"));
     }
 
     #[test]
     fn test_csv_error() {
         let err = GaggleError::CsvError("invalid csv format".to_string());
-        assert_eq!(err.to_string(), "CSV parsing error: invalid csv format");
+        let msg = err.to_string();
+        assert!(msg.contains("[E008]"));
+        assert!(msg.contains("invalid csv format"));
     }
 
     #[test]
@@ -233,7 +393,9 @@ mod tests {
         assert!(utf8_result.is_err());
 
         let err: GaggleError = utf8_result.unwrap_err().into();
-        assert_eq!(err.to_string(), "Invalid UTF-8 string");
+        let msg = err.to_string();
+        assert!(msg.contains("[E009]"));
+        assert!(msg.contains("Invalid UTF-8"));
     }
 
     #[test]
@@ -297,7 +459,9 @@ mod tests {
     #[test]
     fn test_credentials_error_empty_message() {
         let err = GaggleError::CredentialsError(String::new());
-        assert_eq!(err.to_string(), "Invalid Kaggle credentials: ");
+        let msg = err.to_string();
+        assert!(msg.contains("[E001]"));
+        assert!(msg.contains("Invalid Kaggle credentials"));
     }
 
     #[test]

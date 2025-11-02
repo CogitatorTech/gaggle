@@ -39,7 +39,7 @@ It outlines features to be implemented and their current status.
     * [x] CSV and TSV file reading.
     * [x] Parquet file reading.
     * [x] JSON file reading.
-    * [ ] Excel and XLSX file reading.
+    * [ ] Excel (XLSX) file reading. (Available when DuckDB is built with the Excel reader; replacement scan routes `.xlsx` to `read_excel`.)
 * **Querying Datasets**
     * [x] Replacement scan for `kaggle:` URLs.
     * [ ] Virtual table support for lazy loading.
@@ -49,7 +49,7 @@ It outlines features to be implemented and their current status.
 * **Concurrency Control**
     * [x] Thread-safe credential storage.
     * [x] Thread-safe cache access.
-    * [x] Concurrent dataset downloads (with per-dataset serialization to prevent race conditions).
+    * [x] Concurrent dataset downloads.
 * **Network Optimization**
     * [x] Configurable HTTP timeouts.
     * [x] Retry logic with backoff for failed requests.
@@ -63,11 +63,11 @@ It outlines features to be implemented and their current status.
     * [x] Clear error messages for invalid credentials.
     * [x] Clear error messages for missing datasets.
     * [x] Clear error messages for `NULL` inputs.
-    * [ ] Detailed error codes for programmatic error handling.
+    * [x] Detailed error codes for programmatic error handling.
 * **Resilience**
     * [x] Automatic retry on network failures.
     * [ ] Graceful degradation when Kaggle API is unavailable.
-    * [ ] Local-only mode for cached datasets.
+    * [x] Local-only mode for cached datasets (via `GAGGLE_OFFLINE`).
 
 ### 6. Documentation and Distribution
 
@@ -80,8 +80,13 @@ It outlines features to be implemented and their current status.
 * **Testing**
     * [x] Unit tests for core modules (Rust).
     * [x] SQL integration tests (DuckDB shell).
-    * [ ] End-to-end integration tests with mocked HTTP.
+    * [x] End-to-end integration tests with mocked HTTP (basic coverage).
     * [ ] Performance benchmarks.
 * **Distribution**
     * [ ] Pre-compiled extension binaries for Linux, macOS, and Windows.
     * [ ] Submission to the DuckDB Community Extensions repository.
+
+### 7. Observability
+
+* **Logging**
+    * [x] Structured logging via `tracing` with `GAGGLE_LOG_LEVEL`.

@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::env;
 use std::thread::sleep;
 use std::time::Duration;
+use tracing::{debug, trace, warn};
 
 /// Helper: get API base URL (overridable at runtime via env for testing)
 pub(crate) fn get_api_base() -> String {
@@ -33,6 +34,7 @@ pub(crate) fn build_client() -> Result<Client, GaggleError> {
         "Gaggle/{} (+https://github.com/CogitatorTech/gaggle)",
         env!("CARGO_PKG_VERSION")
     );
+    debug!(?timeout, "building HTTP client");
     Ok(reqwest::blocking::ClientBuilder::new()
         .timeout(timeout)
         .user_agent(ua)
@@ -50,13 +52,14 @@ where
     let mut last_err: Option<GaggleError> = None;
 
     for i in 0..max_attempts {
+        trace!(attempt = i + 1, max_attempts, "issuing HTTP call");
         match f() {
             Ok(v) => return Ok(v),
             Err(e) => {
                 last_err = Some(e);
                 if i + 1 < max_attempts {
+                    warn!(attempt = i + 1, ?delay, "HTTP call failed; retrying");
                     sleep(delay);
-                    // Exponential backoff with configurable cap
                     let next = delay
                         .as_millis()
                         .saturating_mul(2)

@@ -9,6 +9,14 @@ pub fn search_datasets(
     page: i32,
     page_size: i32,
 ) -> Result<serde_json::Value, GaggleError> {
+    // Strict offline: fail fast
+    if crate::config::offline_mode() {
+        return Err(GaggleError::HttpRequestError(
+            "Offline mode enabled; search is disabled. Unset GAGGLE_OFFLINE to enable network."
+                .to_string(),
+        ));
+    }
+
     // Validate inputs
     if page < 1 {
         return Err(GaggleError::InvalidDatasetPath(format!(
