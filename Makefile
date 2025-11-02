@@ -113,7 +113,7 @@ debug: rust-build-debug ## Build the extension in debug mode (DuckDB + extension
 .PHONY: install-deps
 install-deps: ## Set up development environment (for Debian-based systems)
 	@echo "Setting up development environment..."
-	@sudo apt-get install -y cmake clang-format snap python3-pip
+	@sudo apt-get install -y cmake clang-format snap python3-pip liblzma-dev
 	@sudo snap install rustup --classic
 	@cargo install cargo-tarpaulin cbindgen cargo-edit cargo-audit cargo-outdated cargo-careful
 	@cd gaggle && cargo check --features "tract"

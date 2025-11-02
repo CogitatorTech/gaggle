@@ -1,7 +1,7 @@
 ## Testing Gaggle Extension
 
 This directory contains a collection of mainly Sqllogictest-style tests for the Gaggle DuckDB extension.
-These tests are different than other tests like Rust tests in [gaggle](../gaggle/src).
+These tests are different than other tests like Rust tests for the [gaggle](../gaggle) crate.
 
 ### Prerequisites
 

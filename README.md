@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-read-blue?style=flat&labelColor=282c34&logo=read-the-docs)](https://github.com/CogitatorTech/gaggle/tree/main/docs)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/CogitatorTech/gaggle)
 
-Access and Query Kaggle Datasets from DuckDB
+Access and query Kaggle datasets from DuckDB
 
 </div>
 

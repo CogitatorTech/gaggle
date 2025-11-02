@@ -41,7 +41,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc curl pkg-config libssl-dev make
+          sudo apt-get install -y gcc curl pkg-config libssl-dev make liblzma-dev
           cargo install cargo-tarpaulin --locked || true
 
       - name: Run Rust Tests
@@ -73,7 +73,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc curl pkg-config libssl-dev make
+          sudo apt-get install -y gcc curl pkg-config libssl-dev make liblzma-dev
 
       - name: Build Extension & Run SQL Tests
         run: |
