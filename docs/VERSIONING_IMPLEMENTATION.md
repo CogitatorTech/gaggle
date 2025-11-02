@@ -195,16 +195,16 @@ SELECT gaggle_download('owner/dataset@latest');  -- Explicit latest
 ```rust
 pub fn get_current_version(dataset_path: &str) -> Result<String, GaggleError> {
     let metadata = get_dataset_metadata(dataset_path)?;
-    
+
     // Try multiple fields in Kaggle API response
     if let Some(version) = metadata.get("currentVersionNumber") {
         // Direct version field
     }
-    
+
     if let Some(versions) = metadata.get("versions") {
         // Array of versions, take first (latest)
     }
-    
+
     Ok("1".to_string())  // Fallback
 }
 ```
@@ -396,7 +396,7 @@ FROM (
 1. **No automatic staleness detection**
    - `gaggle_download()` doesn't check if cached version is outdated
    - Users must explicitly call `gaggle_is_current()` or `gaggle_update_dataset()`
-   
+
 2. **No version pinning**
    - Can't download specific versions
    - Always gets latest version
@@ -480,4 +480,3 @@ Still need to update:
 - Implementation time: ~2 hours
 
 The versioning foundation is solid and ready for production use!
-

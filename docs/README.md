@@ -12,8 +12,11 @@ The table below includes the information about all SQL functions exposed by Gagg
 | 6 | `gaggle_purge_cache()`                                          | `BOOLEAN`        | Clears the dataset cache directory. Returns `true` on success.                                                           |
 | 7 | `gaggle_cache_info()`                                           | `VARCHAR (JSON)` | Returns cache info JSON with `path`, `size_mb`, `limit_mb`, `usage_percent`, `is_soft_limit`, and `type` fields.         |
 | 8 | `gaggle_enforce_cache_limit()`                                  | `BOOLEAN`        | Manually enforces cache size limit using LRU eviction. Returns `true` on success. (Automatic with soft limit by default).|
-| 9 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object/array into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`.                |
-| 10| `gaggle_file_paths(dataset_path VARCHAR, filename VARCHAR)`     | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                       |
+| 9 | `gaggle_is_current(dataset_path VARCHAR)`                       | `BOOLEAN`        | Checks if cached dataset is the latest version from Kaggle. Returns `false` if not cached or outdated.                   |
+| 10| `gaggle_update_dataset(dataset_path VARCHAR)`                   | `VARCHAR`        | Forces update to latest version (ignores cache). Returns local path to freshly downloaded dataset.                       |
+| 11| `gaggle_version_info(dataset_path VARCHAR)`                     | `VARCHAR (JSON)` | Returns version info: `cached_version`, `latest_version`, `is_current`, `is_cached`.                                     |
+| 12| `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object/array into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`.                |
+| 13| `gaggle_file_paths(dataset_path VARCHAR, filename VARCHAR)`     | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                       |
 
 > [!NOTE]
 > Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
@@ -26,7 +29,7 @@ Table function:
 
 | #  | Function                          | Return Type                                      | Description                                                                    |
 |----|:----------------------------------|:-------------------------------------------------|:-------------------------------------------------------------------------------|
-| 11 | `gaggle_ls(dataset_path VARCHAR)` | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursive) in the dataset's local directory; `size` is in MB. |
+| 14 | `gaggle_ls(dataset_path VARCHAR)` | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursive) in the dataset's local directory; `size` is in MB. |
 
 Replacement scan (transparent table read):
 
@@ -85,6 +88,35 @@ from 'kaggle:owner/dataset/file.parquet';
 -- Replacement scan: glob Parquet files in a dataset directory
 select count(*)
 from 'kaggle:owner/dataset/*.parquet';
+```
+
+#### Dataset Versioning
+
+```sql
+-- Check if cached dataset is the latest version
+select gaggle_is_current('owner/dataset') as is_current;
+
+-- Get detailed version information
+select gaggle_version_info('owner/dataset') as version_info;
+-- Returns: {"cached_version": "3", "latest_version": "5", "is_current": false, "is_cached": true}
+
+-- Force update to latest version (ignores cache)
+select gaggle_update_dataset('owner/dataset') as updated_path;
+
+-- Download specific version (version pinning)
+select gaggle_download('owner/dataset@v2');     -- Version 2
+select gaggle_download('owner/dataset@5');      -- Version 5 (without 'v' prefix)
+select gaggle_download('owner/dataset@latest'); -- Explicit latest
+
+-- Use versioned datasets in queries
+select * from 'kaggle:owner/dataset@v2/file.csv';
+select * from 'kaggle:owner/dataset@v5/*.parquet';
+
+-- Smart download: update only if outdated
+select CASE
+    WHEN gaggle_is_current('owner/dataset') THEN gaggle_download('owner/dataset')
+    ELSE gaggle_update_dataset('owner/dataset')
+END as path;
 ```
 
 #### Utility Functions

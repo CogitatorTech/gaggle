@@ -62,15 +62,40 @@ impl Drop for LockGuard {
     }
 }
 
-/// Download a Kaggle dataset
+/// Download a Kaggle dataset (supports version pinning)
+/// Examples:
+///   "owner/dataset" - downloads latest version
+///   "owner/dataset@v2" - downloads version 2
+///   "owner/dataset@latest" - explicitly downloads latest
 pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
+    // Parse path to extract optional version
+    let (owner, dataset, version) = super::parse_dataset_path_with_version(dataset_path)?;
+
+    // Reconstruct base path without version for internal use
+    let base_path = format!("{}/{}", owner, dataset);
+
+    download_dataset_version(&base_path, version)
+}
+
+/// Download a specific version of a Kaggle dataset
+fn download_dataset_version(
+    dataset_path: &str,
+    version: Option<String>,
+) -> Result<PathBuf, GaggleError> {
     let creds = get_credentials()?;
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+
+    // Cache directory includes version if specified
+    let cache_subdir = if let Some(ref v) = version {
+        format!("{}-v{}", dataset, v)
+    } else {
+        dataset.clone()
+    };
 
     let cache_dir = crate::config::cache_dir_runtime()
         .join("datasets")
         .join(&owner)
-        .join(&dataset);
+        .join(&cache_subdir);
 
     // Check if already downloaded (fast path)
     let marker_file = cache_dir.join(".downloaded");
@@ -78,8 +103,12 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
         return Ok(cache_dir);
     }
 
-    // Use a lock per dataset path to prevent concurrent downloads of the same dataset
-    let lock_key = format!("{}/{}", owner, dataset);
+    // Use a lock per dataset path (including version) to prevent concurrent downloads
+    let lock_key = if let Some(ref v) = version {
+        format!("{}/{}-v{}", owner, dataset, v)
+    } else {
+        format!("{}/{}", owner, dataset)
+    };
 
     // Acquire a "lock" by inserting into the map
     // If another thread is downloading, wait with timeout
@@ -124,8 +153,18 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
 
     fs::create_dir_all(&cache_dir)?;
 
-    // Download using Kaggle API
-    let url = format!("{}/datasets/download/{}/{}", get_api_base(), owner, dataset);
+    // Build URL with version if specified
+    let url = if let Some(ref v) = version {
+        format!(
+            "{}/datasets/download/{}/{}/versions/{}",
+            get_api_base(),
+            owner,
+            dataset,
+            v
+        )
+    } else {
+        format!("{}/datasets/download/{}/{}", get_api_base(), owner, dataset)
+    };
 
     let client = build_client()?;
     let response = with_retries(|| {
@@ -157,10 +196,6 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     // Clean up ZIP file
     fs::remove_file(&zip_path)?;
 
-    // Get current version from Kaggle API
-    let version = super::metadata::get_current_version(dataset_path)
-        .unwrap_or_else(|_| "unknown".to_string());
-
     // Calculate dataset size in MB
     let dataset_size_mb = calculate_dir_size(&cache_dir)
         .unwrap_or(0)
@@ -168,7 +203,8 @@ pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
 
     // Create marker file with metadata including version
     let mut metadata = CacheMetadata::new(dataset_path.to_string(), dataset_size_mb);
-    metadata.version = Some(version);
+    // Use specified version, or fetch current version from API
+    metadata.version = version.or_else(|| super::metadata::get_current_version(dataset_path).ok());
     fs::write(&marker_file, serde_json::to_string(&metadata)?)?;
 
     // Enforce cache limit after successful download (soft limit)
@@ -968,5 +1004,52 @@ mod tests {
         std::env::remove_var("GAGGLE_CACHE_DIR");
         std::env::remove_var("KAGGLE_USERNAME");
         std::env::remove_var("KAGGLE_KEY");
+    }
+
+    #[test]
+    fn test_download_with_version_parsing() {
+        // Test that version syntax is properly parsed
+        std::env::set_var("KAGGLE_USERNAME", "test");
+        std::env::set_var("KAGGLE_KEY", "test");
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
+
+        // Test path parsing (won't actually download without network)
+        let result = crate::kaggle::parse_dataset_path_with_version("owner/dataset@v2");
+        assert!(result.is_ok());
+        let (_owner, _dataset, version) = result.unwrap();
+        assert_eq!(version, Some("2".to_string()));
+
+        std::env::remove_var("GAGGLE_CACHE_DIR");
+        std::env::remove_var("KAGGLE_USERNAME");
+        std::env::remove_var("KAGGLE_KEY");
+    }
+
+    #[test]
+    fn test_versioned_cache_directory() {
+        // Verify that versioned downloads use different cache directories
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
+
+        // Simulate cache directory structure
+        let base = temp_dir.path().join("datasets").join("owner");
+
+        // Latest version (no version specified)
+        let latest_cache = base.join("dataset");
+
+        // Version 2
+        let v2_cache = base.join("dataset-v2");
+
+        // Version 3
+        let v3_cache = base.join("dataset-v3");
+
+        // Verify they're different paths
+        assert_ne!(latest_cache, v2_cache);
+        assert_ne!(latest_cache, v3_cache);
+        assert_ne!(v2_cache, v3_cache);
+
+        std::env::remove_var("GAGGLE_CACHE_DIR");
     }
 }

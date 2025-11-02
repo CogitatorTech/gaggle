@@ -81,6 +81,51 @@ pub fn parse_dataset_path(path: &str) -> Result<(String, String), crate::error::
     Ok((owner.to_string(), dataset.to_string()))
 }
 
+/// Parse dataset path with optional version
+/// Supports formats:
+///   "owner/dataset" -> (owner, dataset, None)
+///   "owner/dataset@v2" -> (owner, dataset, Some("2"))
+///   "owner/dataset@5" -> (owner, dataset, Some("5"))
+///   "owner/dataset@latest" -> (owner, dataset, None)
+pub fn parse_dataset_path_with_version(
+    path: &str,
+) -> Result<(String, String, Option<String>), crate::error::GaggleError> {
+    // Split on @ to extract version
+    let parts: Vec<&str> = path.split('@').collect();
+
+    if parts.len() > 2 {
+        return Err(crate::error::GaggleError::InvalidDatasetPath(
+            "Dataset path can only contain one @ for version specification".to_string(),
+        ));
+    }
+
+    let dataset_path = parts[0];
+    let version = if parts.len() == 2 {
+        let v = parts[1].trim();
+        if v == "latest" || v.is_empty() {
+            None
+        } else {
+            // Remove 'v' prefix if present (both @v2 and @2 are valid)
+            let version_str = v.strip_prefix('v').unwrap_or(v);
+            // Validate it's a positive integer
+            if version_str.parse::<u32>().is_err() {
+                return Err(crate::error::GaggleError::InvalidDatasetPath(format!(
+                    "Invalid version number '{}'. Version must be a positive integer.",
+                    v
+                )));
+            }
+            Some(version_str.to_string())
+        }
+    } else {
+        None
+    };
+
+    // Parse owner/dataset from the base path
+    let (owner, dataset) = parse_dataset_path(dataset_path)?;
+
+    Ok((owner, dataset, version))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,6 +246,96 @@ mod tests {
             }
             _ => panic!("Expected InvalidDatasetPath error for oversized path"),
         }
+    }
+
+    // Version parsing tests
+    #[test]
+    fn test_parse_with_version_v_prefix() {
+        let (owner, dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@v2").unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(dataset, "dataset");
+        assert_eq!(version, Some("2".to_string()));
+    }
+
+    #[test]
+    fn test_parse_with_version_no_v_prefix() {
+        let (owner, dataset, version) = parse_dataset_path_with_version("owner/dataset@5").unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(dataset, "dataset");
+        assert_eq!(version, Some("5".to_string()));
+    }
+
+    #[test]
+    fn test_parse_with_version_latest() {
+        let (owner, dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@latest").unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(dataset, "dataset");
+        assert_eq!(version, None);
+    }
+
+    #[test]
+    fn test_parse_no_version() {
+        let (owner, dataset, version) = parse_dataset_path_with_version("owner/dataset").unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(dataset, "dataset");
+        assert_eq!(version, None);
+    }
+
+    #[test]
+    fn test_parse_version_invalid_not_number() {
+        let result = parse_dataset_path_with_version("owner/dataset@abc");
+        assert!(result.is_err());
+        if let Err(crate::error::GaggleError::InvalidDatasetPath(msg)) = result {
+            assert!(msg.contains("Invalid version number"));
+        }
+    }
+
+    #[test]
+    fn test_parse_version_multiple_at_signs() {
+        let result = parse_dataset_path_with_version("owner/dataset@v2@v3");
+        assert!(result.is_err());
+        if let Err(crate::error::GaggleError::InvalidDatasetPath(msg)) = result {
+            assert!(msg.contains("one @"));
+        }
+    }
+
+    #[test]
+    fn test_parse_version_with_hyphenated_name() {
+        let (owner, dataset, version) =
+            parse_dataset_path_with_version("my-owner/my-dataset@v10").unwrap();
+        assert_eq!(owner, "my-owner");
+        assert_eq!(dataset, "my-dataset");
+        assert_eq!(version, Some("10".to_string()));
+    }
+
+    #[test]
+    fn test_parse_version_zero() {
+        let (_owner, _dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@0").unwrap();
+        assert_eq!(version, Some("0".to_string()));
+    }
+
+    #[test]
+    fn test_parse_version_large_number() {
+        let (_owner, _dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@v999").unwrap();
+        assert_eq!(version, Some("999".to_string()));
+    }
+
+    #[test]
+    fn test_parse_version_empty_after_at() {
+        let (_owner, _dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@").unwrap();
+        assert_eq!(version, None); // Empty after @ treated as latest
+    }
+
+    #[test]
+    fn test_parse_version_with_whitespace() {
+        let (_owner, _dataset, version) =
+            parse_dataset_path_with_version("owner/dataset@v2 ").unwrap();
+        assert_eq!(version, Some("2".to_string())); // Should trim whitespace
     }
 
     #[test]

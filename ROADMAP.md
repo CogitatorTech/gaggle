@@ -17,10 +17,10 @@ It outlines features to be implemented and their current status.
     * [x] Download datasets from Kaggle.
     * [x] List files in a dataset.
     * [x] Get dataset metadata.
+    * [x] Dataset version awareness and tracking.
+    * [x] Download specific dataset versions (version pinning).
+    * [x] Check for dataset updates.
     * [ ] Upload DuckDB tables to Kaggle.
-    * [ ] Dataset version awareness and tracking.
-    * [ ] Download specific dataset versions.
-    * [ ] Check for dataset updates.
 
 ### 2. Caching and Storage
 

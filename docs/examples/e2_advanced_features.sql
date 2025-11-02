@@ -37,4 +37,15 @@ select gaggle_cache_info() as cache_status;
 select '## Purge cache (optional)';
 -- select gaggle_purge_cache() as cache_purged;
 
+-- Section 5: Dataset versioning
+select '## Check dataset versions';
+-- Check if cached dataset is the latest version
+select gaggle_is_current('habedi/flickr-8k-dataset-clean') as is_current;
+
+-- Get detailed version information
+select gaggle_version_info('habedi/flickr-8k-dataset-clean') as version_info;
+
+-- Force update to latest version (if cache is outdated)
+-- select gaggle_update_dataset('habedi/flickr-8k-dataset-clean') as updated_path;
+
 .echo off

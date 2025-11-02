@@ -12,3 +12,4 @@ pub use ffi::{
     gaggle_list_files, gaggle_search, gaggle_set_credentials, gaggle_update_dataset,
 };
 pub use kaggle::parse_dataset_path;
+pub use kaggle::parse_dataset_path_with_version;

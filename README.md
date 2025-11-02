@@ -121,6 +121,15 @@ select gaggle_cache_info();
 
 -- Enforce cache size limit manually (automatic with soft limit by default)
 select gaggle_enforce_cache_limit();
+
+-- Check if cached dataset is current
+select gaggle_is_current('habedi/flickr-8k-dataset-clean');
+
+-- Force update to latest version if needed
+-- select gaggle_update_dataset('habedi/flickr-8k-dataset-clean');
+
+-- Download specific version (version pinning for reproducibility)
+-- select gaggle_download('habedi/flickr-8k-dataset-clean@v2');
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
