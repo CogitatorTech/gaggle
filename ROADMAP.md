@@ -6,7 +6,7 @@ It outlines features to be implemented and their current status.
 > [!IMPORTANT]
 > This roadmap is a work in progress and is subject to change.
 
-### 1. Kaggle API Integration
+### 1. Kaggle API
 
 * **Authentication**
     * [x] Set Kaggle API credentials programmatically.
@@ -57,7 +57,7 @@ It outlines features to be implemented and their current status.
     * [ ] Incremental cache updates.
     * [ ] Background cache synchronization.
 
-### 5. Error Handling and Resilience
+### 5. Error Handling
 
 * **Error Messages**
     * [x] Clear error messages for invalid credentials.

@@ -1,12 +1,41 @@
 use crate::error::GaggleError;
 use reqwest::blocking::Client;
 
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 #[cfg(test)]
 use std::cell::RefCell;
 use std::env;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
+
+/// Optional global rate limiter: enforce a minimum interval between API calls
+static LAST_API_CALL: Lazy<Mutex<Instant>> =
+    Lazy::new(|| Mutex::new(Instant::now() - Duration::from_secs(3600)));
+
+fn min_interval() -> Duration {
+    let ms = env::var("GAGGLE_API_MIN_INTERVAL_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    Duration::from_millis(ms)
+}
+
+fn rate_limit_wait() {
+    let interval = min_interval();
+    if interval.as_millis() == 0 {
+        return;
+    }
+    let mut guard = LAST_API_CALL.lock();
+    let elapsed = guard.elapsed();
+    if elapsed < interval {
+        let sleep_for = interval - elapsed;
+        trace!(?sleep_for, "rate limit sleep before API call");
+        sleep(sleep_for);
+    }
+    *guard = Instant::now();
+}
 
 /// Helper: get API base URL (overridable at runtime via env for testing)
 pub(crate) fn get_api_base() -> String {
@@ -54,6 +83,7 @@ where
 
     for i in 0..max_attempts {
         trace!(attempt = i + 1, max_attempts, "issuing HTTP call");
+        rate_limit_wait();
         match f() {
             Ok(v) => return Ok(v),
             Err(e) => {
@@ -207,5 +237,13 @@ mod tests {
         env::remove_var("GAGGLE_HTTP_RETRY_DELAY");
         env::remove_var("GAGGLE_HTTP_RETRY_MAX_DELAY");
         env::remove_var("GAGGLE_HTTP_RETRY_ATTEMPTS");
+    }
+
+    #[test]
+    fn test_rate_limit_no_sleep_when_disabled() {
+        env::remove_var("GAGGLE_API_MIN_INTERVAL_MS");
+        let start = Instant::now();
+        rate_limit_wait();
+        assert!(start.elapsed() < Duration::from_millis(5));
     }
 }

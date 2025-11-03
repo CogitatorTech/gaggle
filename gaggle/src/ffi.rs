@@ -13,20 +13,15 @@ pub extern "C" fn gaggle_init_logging() {
 
 /// Set Kaggle API credentials
 ///
-/// # Arguments
+/// Arguments:
+/// - `username`: non-null pointer to a NUL-terminated C string
+/// - `key`: non-null pointer to a NUL-terminated C string
 ///
-/// * `username` - A pointer to a null-terminated C string representing the Kaggle username.
-/// * `key` - A pointer to a null-terminated C string representing the Kaggle API key.
-///
-/// # Returns
-///
-/// * `0` on success.
-/// * `-1` on failure. Call `gaggle_last_error()` to get a descriptive error message.
+/// Returns 0 on success, -1 on failure (call gaggle_last_error).
 ///
 /// # Safety
-///
-/// * The `username` and `key` pointers must not be null.
-/// * The memory pointed to by `username` and `key` must be valid, null-terminated C strings.
+/// - The pointers must be valid and remain alive for the duration of this call.
+/// - Strings must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_set_credentials(
     username: *const c_char,
@@ -41,6 +36,14 @@ pub unsafe extern "C" fn gaggle_set_credentials(
         }
         let username_str = CStr::from_ptr(username).to_str()?;
         let key_str = CStr::from_ptr(key).to_str()?;
+
+        // Input length guardrails to avoid accidental huge strings
+        const MAX_LEN: usize = 8192;
+        if username_str.len() > MAX_LEN || key_str.len() > MAX_LEN {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "input too long".to_string(),
+            ));
+        }
 
         kaggle::credentials::set_credentials(username_str, key_str)?;
         Ok(())
@@ -57,19 +60,13 @@ pub unsafe extern "C" fn gaggle_set_credentials(
 
 /// Download a Kaggle dataset and return its local cache path
 ///
-/// # Arguments
+/// Arguments:
+/// - `dataset_path`: non-null pointer to a NUL-terminated C string "owner/dataset[[@vN|@latest]]".
 ///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path (e.g., "owner/dataset-name").
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing the local path, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
+/// Returns pointer to a heap-allocated C string. Free with gaggle_free(). On error, returns NULL and sets gaggle_last_error.
 ///
 /// # Safety
-///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// - The pointer must be valid and the string valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -80,6 +77,11 @@ pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) ->
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
 
         let local_path = kaggle::download_dataset(path_str)?;
         Ok(local_path.to_string_lossy().to_string())
@@ -96,20 +98,14 @@ pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) ->
 
 /// Get the local path to a specific file in a downloaded dataset
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-/// * `filename` - A pointer to a null-terminated C string representing the filename.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing the file path, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
+/// Arguments:
+/// - `dataset_path`: non-null pointer to owner/dataset
+/// - `filename`: non-null pointer to relative filename within the dataset
 ///
 /// # Safety
 ///
-/// * The pointers must not be null.
-/// * The memory pointed to must be valid, null-terminated C strings.
+/// Both pointers must be valid and point to valid NUL-terminated C strings.
+/// Strings must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_get_file_path(
     dataset_path: *const c_char,
@@ -124,6 +120,11 @@ pub unsafe extern "C" fn gaggle_get_file_path(
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
         let filename_str = CStr::from_ptr(filename).to_str()?;
+        if path_str.len() > 4096 || filename_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "input too long".to_string(),
+            ));
+        }
 
         let file_path = kaggle::get_dataset_file_path(path_str, filename_str)?;
         Ok(file_path.to_string_lossy().to_string())
@@ -140,19 +141,10 @@ pub unsafe extern "C" fn gaggle_get_file_path(
 
 /// List files in a Kaggle dataset
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing JSON array of files, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
-///
 /// # Safety
 ///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -163,6 +155,11 @@ pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut 
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
 
         let files = kaggle::list_dataset_files(path_str)?;
         let json = serde_json::to_string(&files)?;
@@ -180,21 +177,10 @@ pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut 
 
 /// Search for Kaggle datasets
 ///
-/// # Arguments
-///
-/// * `query` - A pointer to a null-terminated C string representing the search query.
-/// * `page` - Page number (1-indexed).
-/// * `page_size` - Number of results per page.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing JSON search results, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
-///
 /// # Safety
 ///
-/// * The `query` pointer must not be null.
-/// * The memory pointed to by `query` must be a valid, null-terminated C string.
+/// The query pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_search(
     query: *const c_char,
@@ -209,6 +195,11 @@ pub unsafe extern "C" fn gaggle_search(
             return Err(error::GaggleError::NullPointer);
         }
         let query_str = CStr::from_ptr(query).to_str()?;
+        if query_str.len() > 8192 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "query too long".to_string(),
+            ));
+        }
 
         let results = kaggle::search_datasets(query_str, page, page_size)?;
         let json = serde_json::to_string(&results)?;
@@ -226,19 +217,10 @@ pub unsafe extern "C" fn gaggle_search(
 
 /// Get metadata for a specific Kaggle dataset
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing JSON metadata, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
-///
 /// # Safety
 ///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -249,6 +231,11 @@ pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) ->
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
 
         let metadata = kaggle::get_dataset_metadata(path_str)?;
         let json = serde_json::to_string(&metadata)?;
@@ -265,11 +252,6 @@ pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) ->
 }
 
 /// Get version information
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing the version string (e.g., "0.1.0").
-/// The caller must free this pointer using `gaggle_free()`.
 #[no_mangle]
 pub extern "C" fn gaggle_get_version() -> *mut c_char {
     // Return only the version string (no JSON wrapper)
@@ -280,8 +262,9 @@ pub extern "C" fn gaggle_get_version() -> *mut c_char {
 ///
 /// # Safety
 ///
-/// The `ptr` must be a non-null pointer to a C string that was previously allocated
-/// by a Gaggle function.
+/// `ptr` must be a pointer previously returned by a Gaggle FFI function that transfers ownership
+/// (e.g., gaggle_get_version, gaggle_list_files, etc.).
+/// Passing the same pointer twice, or a pointer not allocated by Gaggle, results in undefined behavior.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_free(ptr: *mut c_char) {
     if !ptr.is_null() {
@@ -290,11 +273,6 @@ pub unsafe extern "C" fn gaggle_free(ptr: *mut c_char) {
 }
 
 /// Clear the dataset cache
-///
-/// # Returns
-///
-/// * `0` on success.
-/// * `-1` on failure.
 #[no_mangle]
 pub extern "C" fn gaggle_clear_cache() -> i32 {
     let result = (|| -> Result<(), error::GaggleError> {
@@ -319,11 +297,6 @@ pub extern "C" fn gaggle_clear_cache() -> i32 {
 }
 
 /// Enforce cache size limit by evicting oldest datasets
-///
-/// # Returns
-///
-/// * `0` on success.
-/// * `-1` on failure.
 #[no_mangle]
 pub extern "C" fn gaggle_enforce_cache_limit() -> i32 {
     let result = kaggle::download::enforce_cache_limit_now();
@@ -339,20 +312,10 @@ pub extern "C" fn gaggle_enforce_cache_limit() -> i32 {
 
 /// Check if cached dataset is the current version
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-///
-/// # Returns
-///
-/// * `1` if cached version is current.
-/// * `0` if cached version is outdated or not cached.
-/// * `-1` on error.
-///
 /// # Safety
 ///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) -> i32 {
     error::clear_last_error_internal();
@@ -362,6 +325,11 @@ pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) 
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
         kaggle::is_dataset_current(path_str)
     })();
 
@@ -377,19 +345,10 @@ pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) 
 
 /// Force update dataset to latest version (ignores cache)
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing the local path, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
-///
 /// # Safety
 ///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *mut c_char {
     error::clear_last_error_internal();
@@ -399,6 +358,11 @@ pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
 
         let local_path = kaggle::update_dataset(path_str)?;
         Ok(local_path.to_string_lossy().to_string())
@@ -415,19 +379,10 @@ pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *
 
 /// Get version information for a dataset
 ///
-/// # Arguments
-///
-/// * `dataset_path` - A pointer to a null-terminated C string representing the dataset path.
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing JSON version info, or NULL on failure.
-/// The caller must free this pointer using `gaggle_free()`.
-///
 /// # Safety
 ///
-/// * The `dataset_path` pointer must not be null.
-/// * The memory pointed to by `dataset_path` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char) -> *mut c_char {
     error::clear_last_error_internal();
@@ -437,6 +392,11 @@ pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char
             return Err(error::GaggleError::NullPointer);
         }
         let path_str = CStr::from_ptr(dataset_path).to_str()?;
+        if path_str.len() > 4096 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "dataset path too long".to_string(),
+            ));
+        }
 
         let info = kaggle::get_dataset_version_info(path_str)?;
         Ok(info.to_string())
@@ -452,11 +412,6 @@ pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char
 }
 
 /// Get cache information
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing JSON cache info.
-/// The caller must free this pointer using `gaggle_free()`.
 #[no_mangle]
 pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
     let cache_dir = crate::config::cache_dir_runtime();
@@ -500,18 +455,10 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
 
 /// Parse JSON and expand objects/arrays similar to json_each
 ///
-/// # Arguments
-///
-/// * `json_str` - A pointer to a null-terminated C string containing JSON data
-///
-/// # Returns
-///
-/// A pointer to a null-terminated C string containing newline-delimited JSON objects
-///
 /// # Safety
 ///
-/// * The `json_str` pointer must not be null.
-/// * The memory pointed to by `json_str` must be a valid, null-terminated C string.
+/// The pointer must be valid and point to a valid NUL-terminated C string.
+/// The string must be valid UTF-8; interior NULs are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -542,6 +489,53 @@ pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_cha
 
     match result {
         Ok(s) => string_to_c_string(s),
+        Err(e) => {
+            error::set_last_error(&e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Prefetch multiple files in a dataset without downloading the entire archive
+///
+/// # Safety
+///
+/// Both pointers must be valid and point to valid NUL-terminated C strings.
+/// Strings must be valid UTF-8; interior NULs are not allowed.
+#[no_mangle]
+pub unsafe extern "C" fn gaggle_prefetch_files(
+    dataset_path: *const c_char,
+    file_list: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error_internal();
+
+    let result = (|| -> Result<String, error::GaggleError> {
+        if dataset_path.is_null() || file_list.is_null() {
+            return Err(error::GaggleError::NullPointer);
+        }
+        let ds = CStr::from_ptr(dataset_path).to_str()?;
+        let files_str = CStr::from_ptr(file_list).to_str()?;
+        if ds.len() > 4096 || files_str.len() > 1_000_000 {
+            return Err(error::GaggleError::InvalidDatasetPath(
+                "input too long".to_string(),
+            ));
+        }
+        let files: Vec<&str> = files_str
+            .lines()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if files.is_empty() {
+            return Err(error::GaggleError::IoError(
+                "no valid files provided".to_string(),
+            ));
+        }
+        let json_val = crate::kaggle::prefetch_files(ds, &files)?;
+        Ok(json_val.to_string())
+    })();
+
+    match result {
+        Ok(json) => string_to_c_string(json),
         Err(e) => {
             error::set_last_error(&e);
             std::ptr::null_mut()
@@ -997,6 +991,77 @@ mod tests {
         unsafe {
             let msg = CStr::from_ptr(err_ptr).to_str().unwrap();
             assert!(msg.to_lowercase().contains("json"));
+        }
+    }
+
+    #[test]
+    fn test_gaggle_prefetch_files() {
+        let dataset_path = CString::new("owner/dataset").unwrap();
+        let file_list = CString::new("file1.csv\nfile2.csv").unwrap();
+
+        unsafe {
+            let result_ptr =
+                super::gaggle_prefetch_files(dataset_path.as_ptr(), file_list.as_ptr());
+            assert!(!result_ptr.is_null());
+
+            let result_str = CStr::from_ptr(result_ptr).to_str().unwrap();
+            // Should be valid JSON object with dataset and files keys
+            assert!(result_str.starts_with('{'));
+            assert!(result_str.contains("\"dataset\""));
+            assert!(result_str.contains("\"files\""));
+
+            // Free the result
+            super::gaggle_free(result_ptr);
+        }
+    }
+
+    #[test]
+    fn test_gaggle_prefetch_files_null_dataset_path() {
+        let file_list = CString::new("file1.csv\nfile2.csv").unwrap();
+
+        unsafe {
+            let result_ptr = super::gaggle_prefetch_files(std::ptr::null(), file_list.as_ptr());
+            assert!(result_ptr.is_null());
+
+            // Error should be set
+            let err_ptr = error::gaggle_last_error();
+            assert!(!err_ptr.is_null());
+            let err_str = CStr::from_ptr(err_ptr).to_str().unwrap();
+            assert!(err_str.to_lowercase().contains("null pointer"));
+        }
+    }
+
+    #[test]
+    fn test_gaggle_prefetch_files_null_file_list() {
+        let dataset_path = CString::new("owner/dataset").unwrap();
+
+        unsafe {
+            let result_ptr = super::gaggle_prefetch_files(dataset_path.as_ptr(), std::ptr::null());
+            assert!(result_ptr.is_null());
+
+            // Error should be set
+            let err_ptr = error::gaggle_last_error();
+            assert!(!err_ptr.is_null());
+            let err_str = CStr::from_ptr(err_ptr).to_str().unwrap();
+            assert!(err_str.to_lowercase().contains("null pointer"));
+        }
+    }
+
+    #[test]
+    fn test_gaggle_prefetch_files_empty_file_list() {
+        let dataset_path = CString::new("owner/dataset").unwrap();
+        let file_list = CString::new("").unwrap();
+
+        unsafe {
+            let result_ptr =
+                super::gaggle_prefetch_files(dataset_path.as_ptr(), file_list.as_ptr());
+            assert!(result_ptr.is_null());
+
+            // Error should be set (since no valid files were given)
+            let err_ptr = error::gaggle_last_error();
+            assert!(!err_ptr.is_null());
+            let err_str = CStr::from_ptr(err_ptr).to_str().unwrap();
+            assert!(err_str.contains("no valid files"));
         }
     }
 }

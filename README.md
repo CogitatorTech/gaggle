@@ -18,9 +18,10 @@ Access and query Kaggle datasets from DuckDB
 
 ---
 
-Gaggle is a DuckDB extension that allows you to work with Kaggle datasets directly in SQL queries, as if
-they were DuckDB tables.
-It is written in Rust and uses the Kaggle API to search, download, and manage the datasets.
+Gaggle is a DuckDB extension that allows you to work with [Kaggle datasets](https://www.kaggle.com/datasets)
+directly in SQL queries, as if they were DuckDB tables.
+It is written in Rust and uses the [Kaggle API](https://www.kaggle.com/docs/api)
+to search, download, and manage the datasets.
 
 Kaggle hosts a large collection of very useful datasets for data science and machine learning.
 Accessing these datasets typically involves manually downloading a dataset (as a ZIP file),
@@ -93,9 +94,6 @@ make release
 #### Trying Gaggle
 
 ```sql
--- Load the Gaggle extension (only needed if you built from source)
---load 'build/release/extension/gaggle/gaggle.duckdb_extension';
-
 -- Get extension version
 select gaggle_version();
 
@@ -105,7 +103,7 @@ select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
 -- Read a Parquet file from local cache using a prepared statement
--- (Note that DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
+-- (DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
 prepare rp as select * from read_parquet(?) limit 10;
 execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
