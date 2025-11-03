@@ -531,6 +531,11 @@ pub fn is_dataset_current(dataset_path: &str) -> Result<bool, GaggleError> {
     // Get current version from Kaggle
     let current_version = super::metadata::get_current_version(dataset_path)?;
 
+    // If we cannot determine current version, conservatively report not current
+    if current_version == "unknown" {
+        return Ok(false);
+    }
+
     Ok(cached_version == current_version)
 }
 
@@ -579,10 +584,15 @@ pub fn get_dataset_version_info(dataset_path: &str) -> Result<serde_json::Value,
     // Get current version from Kaggle API
     let current_version = super::metadata::get_current_version(dataset_path)?;
 
-    let is_current = cached_version
-        .as_ref()
-        .map(|v| v == &current_version)
-        .unwrap_or(false);
+    // Consider unknown latest version as not current
+    let is_current = if current_version == "unknown" {
+        false
+    } else {
+        cached_version
+            .as_ref()
+            .map(|v| v == &current_version)
+            .unwrap_or(false)
+    };
 
     let info = serde_json::json!({
         "cached_version": cached_version,
@@ -823,7 +833,7 @@ mod tests {
     fn test_list_dataset_files_skips_marker() {
         // This test requires mocking or a real download, which is complex
         // For now, we test the structure of DatasetFile
-        let files = vec![
+        let files = [
             DatasetFile {
                 name: "data.csv".to_string(),
                 size: 1000,

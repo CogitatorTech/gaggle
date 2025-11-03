@@ -122,11 +122,8 @@ mod tests {
             }
             Err(e) => {
                 // Should be HTTP error, not validation error
-                match e {
-                    GaggleError::InvalidDatasetPath(_) => {
-                        panic!("Should not have validation error for valid params")
-                    }
-                    _ => {} // HTTP or credentials error is expected
+                if let GaggleError::InvalidDatasetPath(_) = e {
+                    panic!("Should not have validation error for valid params");
                 }
             }
         }
@@ -147,11 +144,8 @@ mod tests {
             Ok(_) => {} // Succeeded with real credentials
             Err(e) => {
                 // Should not be a validation error
-                match e {
-                    GaggleError::InvalidDatasetPath(_) => {
-                        panic!("Should not have validation error for page=1, size=1")
-                    }
-                    _ => {} // HTTP or credentials error is OK
+                if let GaggleError::InvalidDatasetPath(_) = e {
+                    panic!("Should not have validation error for page=1, size=1");
                 }
             }
         }

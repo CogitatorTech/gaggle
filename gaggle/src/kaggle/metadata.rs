@@ -162,13 +162,8 @@ mod tests {
         let result = get_dataset_metadata("owner/dataset");
         assert!(result.is_err());
         // Should be HTTP error, not path parsing error
-        if let Err(e) = result {
-            match e {
-                GaggleError::InvalidDatasetPath(_) => {
-                    panic!("Should not have path validation error")
-                }
-                _ => {} // HTTP or credentials error expected
-            }
+        if let Err(GaggleError::InvalidDatasetPath(_)) = result {
+            panic!("Should not have path validation error");
         }
 
         std::env::remove_var("KAGGLE_USERNAME");
