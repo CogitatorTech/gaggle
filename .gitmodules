@@ -6,3 +6,7 @@
 	path = external/extension-ci-tools
 	url = https://github.com/duckdb/extension-ci-tools
 	branch = main
+[submodule "external/xz"]
+	path = external/xz
+	url = https://github.com/tukaani-project/xz.git
+	branch = master
