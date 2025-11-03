@@ -118,7 +118,7 @@ select gaggle_cache_info();
 select gaggle_is_current('habedi/flickr-8k-dataset-clean');
 ```
 
-[![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
+[![Simple Demo 1](https://asciinema.org/a/do6g8xv1G5tkRc4e3bExbNYwZ.svg)](https://asciinema.org/a/do6g8xv1G5tkRc4e3bExbNYwZ)
 
 ---
 

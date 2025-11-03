@@ -1,7 +1,7 @@
 {
     "name": "gaggle",
     "version": "0.1.0",
-    "description": "Gaggle DuckDB Extension (C++ dependencies)",
+    "description": "C++ dependencies for Gaggle DuckDB extension",
     "dependencies": [
         {
             "name": "vcpkg-cmake",
@@ -11,8 +11,6 @@
             "name": "vcpkg-cmake-config",
             "host": true
         },
-        {
-            "name": "xz"
-        }
+        "liblzma"
     ]
 }
