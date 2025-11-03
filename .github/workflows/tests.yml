@@ -59,7 +59,7 @@ jobs:
         continue-on-error: false
 
   sqllogictest:
-    name: Sqllogicest Tests
+    name: Sqllogictest Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

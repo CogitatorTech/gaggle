@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use super::api::{build_client, get_api_base, with_retries};
 use super::credentials::get_credentials;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -14,6 +17,19 @@ pub struct DatasetInfo {
     pub last_updated: String,
 }
 
+/// Simple in-memory cache for dataset metadata with TTL
+static META_CACHE: once_cell::sync::Lazy<RwLock<HashMap<String, (serde_json::Value, Instant)>>> =
+    once_cell::sync::Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Metadata cache TTL (seconds), configurable via GAGGLE_METADATA_TTL (default 600s)
+fn metadata_ttl() -> Duration {
+    let secs = std::env::var("GAGGLE_METADATA_TTL")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(600);
+    Duration::from_secs(secs)
+}
+
 /// Get metadata for a specific dataset
 pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, GaggleError> {
     if crate::config::offline_mode() {
@@ -23,6 +39,13 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
                 dataset_path
             ),
         ));
+    }
+
+    // Serve from cache when fresh
+    if let Some((val, ts)) = META_CACHE.read().get(dataset_path).cloned() {
+        if ts.elapsed() < metadata_ttl() {
+            return Ok(val);
+        }
     }
 
     let creds = get_credentials()?;
@@ -47,6 +70,12 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
     }
 
     let json: serde_json::Value = response.json()?;
+
+    // Store in cache
+    META_CACHE
+        .write()
+        .insert(dataset_path.to_string(), (json.clone(), Instant::now()));
+
     Ok(json)
 }
 
@@ -162,13 +191,8 @@ mod tests {
         let result = get_dataset_metadata("owner/dataset");
         assert!(result.is_err());
         // Should be HTTP error, not path parsing error
-        if let Err(e) = result {
-            match e {
-                GaggleError::InvalidDatasetPath(_) => {
-                    panic!("Should not have path validation error")
-                }
-                _ => {} // HTTP or credentials error expected
-            }
+        if let Err(GaggleError::InvalidDatasetPath(_)) = result {
+            panic!("Should not have path validation error");
         }
 
         std::env::remove_var("KAGGLE_USERNAME");

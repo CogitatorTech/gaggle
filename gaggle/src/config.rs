@@ -206,6 +206,15 @@ pub fn offline_mode() -> bool {
         .unwrap_or(false)
 }
 
+/// Whether strict on-demand mode is enabled. When true, gaggle_get_file_path will NOT fall back to
+/// full dataset download if single-file fetch fails.
+pub fn strict_on_demand() -> bool {
+    std::env::var("GAGGLE_STRICT_ONDEMAND")
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,5 +541,19 @@ mod tests {
         std::env::set_var("GAGGLE_OFFLINE", "no");
         assert!(!offline_mode());
         std::env::remove_var("GAGGLE_OFFLINE");
+    }
+
+    #[test]
+    #[serial]
+    fn test_strict_on_demand_env_parsing() {
+        std::env::remove_var("GAGGLE_STRICT_ONDEMAND");
+        assert!(!strict_on_demand());
+        std::env::set_var("GAGGLE_STRICT_ONDEMAND", "1");
+        assert!(strict_on_demand());
+        std::env::set_var("GAGGLE_STRICT_ONDEMAND", "true");
+        assert!(strict_on_demand());
+        std::env::set_var("GAGGLE_STRICT_ONDEMAND", "off");
+        assert!(!strict_on_demand());
+        std::env::remove_var("GAGGLE_STRICT_ONDEMAND");
     }
 }

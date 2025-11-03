@@ -18,9 +18,10 @@ Access and query Kaggle datasets from DuckDB
 
 ---
 
-Gaggle is a DuckDB extension that allows you to work with Kaggle datasets directly in SQL queries, as if
-they were DuckDB tables.
-It is written in Rust and uses the Kaggle API to search, download, and manage the datasets.
+Gaggle is a DuckDB extension that allows you to work with [Kaggle datasets](https://www.kaggle.com/datasets)
+directly in SQL queries, as if they were DuckDB tables.
+It is written in Rust and uses the [Kaggle API](https://www.kaggle.com/docs/api)
+to search, download, and manage the datasets.
 
 Kaggle hosts a large collection of very useful datasets for data science and machine learning.
 Accessing these datasets typically involves manually downloading a dataset (as a ZIP file),
@@ -30,6 +31,7 @@ This workflow can quickly become complex, especially when working with multiple 
 frequently.
 Gaggle tries to help simplify this process by hiding the complexity and letting you work with datasets directly inside
 an analytical database like DuckDB that can handle fast queries.
+
 In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 
 ### Features
@@ -92,22 +94,16 @@ make release
 #### Trying Gaggle
 
 ```sql
--- Load the Gaggle extension (only needed if you built from source)
---load 'build/release/extension/gaggle/gaggle.duckdb_extension';
-
--- Manually, set your Kaggle credentials (or use `~/.kaggle/kaggle.json`)
-select gaggle_set_credentials('your-username', 'your-api-key');
-
 -- Get extension version
 select gaggle_version();
 
 -- List files in the dataset
--- (Note that if the datasets is not downloaded, it will be downloaded and cached automatically)
+-- (Note that if the datasets is not downloaded, it will be downloaded and cached)
 select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
 -- Read a Parquet file from local cache using a prepared statement
--- (Note that DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
+-- (DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
 prepare rp as select * from read_parquet(?) limit 10;
 execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
@@ -115,25 +111,11 @@ execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'
 select count(*)
 from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
 
--- Or glob Parquet files in a dataset directory
-select count(*)
-from 'kaggle:habedi/flickr-8k-dataset-clean/*.parquet';
-
 -- Optionally, we check cache info
 select gaggle_cache_info();
 
--- Clear cache and enforce cache size limit manually
-select gaggle_clear_cache();
-select gaggle_enforce_cache_limit();
-
 -- Check if cached dataset is current (is newest version?)
 select gaggle_is_current('habedi/flickr-8k-dataset-clean');
-
--- Force update to latest version if needed
---select gaggle_update_dataset('habedi/flickr-8k-dataset-clean');
-
--- Download specific version (version pinning for reproducibility)
---select gaggle_download('habedi/flickr-8k-dataset-clean@v2');
 ```
 
 [![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)

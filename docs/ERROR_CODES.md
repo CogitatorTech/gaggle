@@ -1,14 +1,10 @@
-# Gaggle Error Codes Reference
+### Overview
 
-**Version:** 0.1.0  
-**Date:** November 2, 2025
+Gaggle uses standardized error codes to make error handling more predictable and debugging easier.
+Each error includes a numeric code (E001 to E010) that can be used programmatically.
+When troubleshooting, look for the bracketed code (like [E003]) and refer to the corresponding section below.
 
-## Overview
-
-Gaggle uses standardized error codes to make error handling more predictable and debugging easier. Each error includes a
-numeric code (E001-E010) that can be used programmatically.
-
-## Error Code Format
+#### Error Code Format
 
 All errors follow this format:
 
@@ -22,9 +18,9 @@ Example:
 [E002] Dataset not found: owner/invalid-dataset
 ```
 
-## Error Codes
+#### Error Codes
 
-### E001 - Invalid Credentials
+##### E001 - Invalid Credentials
 
 **Category:** Authentication  
 **Code:** `E001`  
@@ -48,37 +44,13 @@ Kaggle API credentials are invalid, missing, or incorrectly formatted.
 
 **Solutions:**
 
-1. **Set credentials via SQL:**
-   ```sql
-   SELECT gaggle_set_credentials('your-username', 'your-api-key');
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   export KAGGLE_USERNAME=your-username
-   export KAGGLE_KEY=your-api-key
-   ```
-
-3. **Create kaggle.json file:**
-   ```bash
-   mkdir -p ~/.kaggle
-   cat > ~/.kaggle/kaggle.json << EOF
-   {
-     "username": "your-username",
-     "key": "your-api-key"
-   }
-   EOF
-   chmod 600 ~/.kaggle/kaggle.json
-   ```
-
-4. **Get your API key from Kaggle:**
-    - Go to https://www.kaggle.com/settings/account
-    - Click "Create New API Token"
-    - Download kaggle.json
+- Set credentials via SQL: `select gaggle_set_credentials('your-username', 'your-api-key');`
+- Or via env: `export KAGGLE_USERNAME=...` and `export KAGGLE_KEY=...`
+- Or create `~/.kaggle/kaggle.json` with username/key (chmod 600)
 
 ---
 
-### E002 - Dataset Not Found
+##### E002 - Dataset Not Found
 
 **Category:** Dataset  
 **Code:** `E002`  
@@ -108,7 +80,7 @@ The requested dataset does not exist on Kaggle or is not accessible.
 
 2. **Search for the dataset:**
    ```sql
-   SELECT gaggle_search('dataset keywords', 1, 10);
+   select gaggle_search('dataset keywords', 1, 10);
    ```
 
 3. **Check dataset availability:**
@@ -117,7 +89,7 @@ The requested dataset does not exist on Kaggle or is not accessible.
 
 ---
 
-### E003 - Network Error
+##### E003 - Network Error
 
 **Category:** Network  
 **Code:** `E003`  
@@ -131,7 +103,7 @@ Network error occurred during communication with Kaggle API.
 - No internet connection
 - Kaggle API is down
 - Firewall blocking requests
-- Timeout
+- A timeout happened
 - Rate limiting
 
 **Example:**
@@ -153,8 +125,7 @@ Network error occurred during communication with Kaggle API.
    ```
 
 3. **Check Kaggle API status:**
-    - Visit https://www.kaggle.com
-    - Check https://status.kaggle.com (if available)
+    - Check https://www.kaggle.com is accessible
 
 4. **Retry with backoff:**
    ```bash
@@ -169,7 +140,7 @@ Network error occurred during communication with Kaggle API.
 
 ---
 
-### E004 - Invalid Path
+##### E004 - Invalid Path
 
 **Category:** Validation  
 **Code:** `E004`  
@@ -212,7 +183,7 @@ owner/.              # Dot component
 
 1. **Use correct format:**
    ```sql
-   SELECT gaggle_download('owner/dataset-name');
+   select gaggle_download('owner/dataset-name');
    ```
 
 2. **Check for special characters:**
@@ -221,7 +192,7 @@ owner/.              # Dot component
 
 ---
 
-### E005 - File System Error
+##### E005 - File System Error
 
 **Category:** I/O  
 **Code:** `E005`  
@@ -259,7 +230,7 @@ Error reading from or writing to the file system.
 
 3. **Verify cache directory:**
    ```sql
-   SELECT gaggle_cache_info();
+   select gaggle_cache_info();
    ```
 
 4. **Change cache directory:**
@@ -269,12 +240,12 @@ Error reading from or writing to the file system.
 
 5. **Clean up cache:**
    ```sql
-   SELECT gaggle_clear_cache();
+   select gaggle_clear_cache();
    ```
 
 ---
 
-### E006 - JSON Error
+##### E006 - JSON Error
 
 **Category:** Serialization  
 **Code:** `E006`  
@@ -300,12 +271,12 @@ Error parsing or serializing JSON data.
 
 1. **Clear cache:**
    ```sql
-   SELECT gaggle_clear_cache();
+   select gaggle_clear_cache();
    ```
 
 2. **Re-download dataset:**
    ```sql
-   SELECT gaggle_update_dataset('owner/dataset');
+   select gaggle_update_dataset('owner/dataset');
    ```
 
 3. **Check Kaggle API response manually:**
@@ -315,7 +286,7 @@ Error parsing or serializing JSON data.
 
 ---
 
-### E007 - ZIP Extraction Error
+##### E007 - ZIP Extraction Error
 
 **Category:** Archive  
 **Code:** `E007`  
@@ -342,12 +313,12 @@ Error extracting downloaded ZIP file.
 
 1. **Re-download dataset:**
    ```sql
-   SELECT gaggle_update_dataset('owner/dataset');
+   select gaggle_update_dataset('owner/dataset');
    ```
 
 2. **Check dataset size:**
    ```sql
-   SELECT gaggle_info('owner/dataset');
+   select gaggle_info('owner/dataset');
    ```
 
 3. **For large datasets:**
@@ -361,7 +332,7 @@ Error extracting downloaded ZIP file.
 
 ---
 
-### E008 - CSV Parsing Error
+##### E008 - CSV Parsing Error
 
 **Category:** Parsing  
 **Code:** `E008`  
@@ -392,13 +363,13 @@ Error parsing CSV file format.
 
 2. **Use DuckDB's flexible CSV reader:**
    ```sql
-   SELECT * FROM read_csv_auto('kaggle:owner/dataset/file.csv',
+   select * FROM read_csv_auto('kaggle:owner/dataset/file.csv',
                                 ignore_errors := true);
    ```
 
 3. **Try different parser options:**
    ```sql
-   SELECT * FROM read_csv('kaggle:owner/dataset/file.csv',
+   select * FROM read_csv('kaggle:owner/dataset/file.csv',
                           delim := ';',
                           quote := '"',
                           escape := '\\');
@@ -406,7 +377,7 @@ Error parsing CSV file format.
 
 ---
 
-### E009 - UTF-8 Encoding Error
+##### E009 - UTF-8 Encoding Error
 
 **Category:** Encoding  
 **Code:** `E009`  
@@ -442,12 +413,12 @@ String is not valid UTF-8.
 
 3. **Use DuckDB encoding options:**
    ```sql
-   SELECT * FROM read_csv('file.csv', encoding := 'ISO-8859-1');
+   select * FROM read_csv('file.csv', encoding := 'ISO-8859-1');
    ```
 
 ---
 
-### E010 - Null Pointer Error
+##### E010 - Null Pointer Error
 
 **Category:** FFI  
 **Code:** `E010`  
@@ -473,129 +444,3 @@ NULL pointer passed to FFI function.
 - This is typically an internal error
 - Report as a bug if you encounter this
 - Include reproduction steps
-
----
-
-## Programmatic Error Handling
-
-### In Rust
-
-```rust
-use gaggle::error::{GaggleError, ErrorCode};
-
-match gaggle::download_dataset("owner/dataset") {
-Ok(path) => println ! ("Downloaded to: {:?}", path),
-Err(e) => {
-match e.code() {
-ErrorCode::E001_InvalidCredentials => {
-// Handle authentication error
-eprintln ! ("Please set Kaggle credentials");
-}
-ErrorCode::E002_DatasetNotFound => {
-// Handle missing dataset
-eprintln ! ("Dataset not found, trying alternative...");
-}
-ErrorCode::E003_NetworkError => {
-// Handle network error
-eprintln ! ("Network error, retrying...");
-}
-_ => {
-// Handle other errors
-eprintln ! ("Error: {}", e);
-}
-}
-}
-}
-```
-
-### In SQL
-
-```sql
--- Check last error after failure
-SELECT gaggle_download('owner/invalid'); -- This fails
-SELECT gaggle_last_error();
--- Get error message with code
-
--- Example output:
--- "[E002] Dataset not found: owner/invalid"
-```
-
-### Parsing Error Codes in Application
-
-```python
-# Python example
-error_msg = execute_sql("SELECT gaggle_last_error()")
-
-if "[E001]" in error_msg:
-    # Handle credentials error
-    setup_credentials()
-elif "[E002]" in error_msg:
-    # Handle dataset not found
-    search_alternative_dataset()
-elif "[E003]" in error_msg:
-    # Handle network error
-    retry_with_backoff()
-```
-
-## Error Recovery Strategies
-
-### Transient Errors (Retry)
-
-- **E003** - Network errors (automatic retry with backoff)
-- **E006** - JSON errors (may be temporary API issue)
-
-### Configuration Errors (User Action Required)
-
-- **E001** - Invalid credentials
-- **E004** - Invalid path format
-
-### Resource Errors (Check System)
-
-- **E005** - I/O errors (disk space, permissions)
-- **E007** - ZIP errors (space, corruption)
-
-### Data Errors (Check Dataset)
-
-- **E002** - Dataset not found
-- **E008** - CSV parsing errors
-
-## Best Practices
-
-1. **Always check error codes in production:**
-   ```sql
-   SELECT CASE
-       WHEN gaggle_is_current('owner/dataset') THEN 'OK'
-       ELSE gaggle_last_error()
-   END;
-   ```
-
-2. **Log errors with codes:**
-    - Include error code in logs
-    - Helps with debugging and monitoring
-
-3. **Implement retry logic for transient errors:**
-    - E003 (Network) - retry with exponential backoff
-    - E006 (JSON) - retry once or twice
-
-4. **Alert on specific error codes:**
-    - E001 (Credentials) - immediate alert
-    - E002 (Not Found) - dataset issue alert
-
-5. **Document error codes in your application:**
-    - Link to this reference
-    - Provide context-specific solutions
-
-## Changelog
-
-### Version 0.1.0 (November 2, 2025)
-
-- Initial error code implementation
-- 10 error codes defined (E001-E010)
-- All error messages updated with codes
-
-## See Also
-
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Troubleshooting guide
-- [FAQ.md](FAQ.md) - Frequently asked questions
-- [CONFIGURATION.md](CONFIGURATION.md) - Configuration options
-- [README.md](../README.md) - Main documentation

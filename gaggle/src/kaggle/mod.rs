@@ -4,15 +4,11 @@ pub mod download;
 pub mod metadata;
 pub mod search;
 
-#[allow(unused_imports)]
-pub use credentials::{get_credentials, set_credentials, KaggleCredentials};
-#[allow(unused_imports)]
 pub use download::{
     download_dataset, get_dataset_file_path, get_dataset_version_info, is_dataset_current,
-    list_dataset_files, update_dataset, DatasetFile,
+    list_dataset_files, update_dataset,
 };
-#[allow(unused_imports)]
-pub use metadata::{get_current_version, get_dataset_metadata, DatasetInfo};
+pub use metadata::get_dataset_metadata;
 pub use search::search_datasets;
 
 /// Parse dataset path like "username/dataset-name"
@@ -107,14 +103,16 @@ pub fn parse_dataset_path_with_version(
         } else {
             // Remove 'v' prefix if present (both @v2 and @2 are valid)
             let version_str = v.strip_prefix('v').unwrap_or(v);
-            // Validate it's a positive integer
-            if version_str.parse::<u32>().is_err() {
-                return Err(crate::error::GaggleError::InvalidDatasetPath(format!(
-                    "Invalid version number '{}'. Version must be a positive integer.",
-                    v
-                )));
+            // Validate it's a positive integer (>0)
+            match version_str.parse::<u32>() {
+                Ok(n) if n > 0 => Some(version_str.to_string()),
+                _ => {
+                    return Err(crate::error::GaggleError::InvalidDatasetPath(format!(
+                        "Invalid version number '{}'. Version must be a positive integer > 0.",
+                        v
+                    )));
+                }
             }
-            Some(version_str.to_string())
         }
     } else {
         None
@@ -124,6 +122,35 @@ pub fn parse_dataset_path_with_version(
     let (owner, dataset) = parse_dataset_path(dataset_path)?;
 
     Ok((owner, dataset, version))
+}
+
+/// Prefetch multiple files within a dataset without downloading the entire archive.
+/// Returns a JSON string with an array of objects: {"name": ..., "status": "ok"|"error", "path"?: ..., "error"?: ...}
+#[allow(dead_code)]
+pub fn prefetch_files(
+    dataset_path: &str,
+    files: &[&str],
+) -> Result<serde_json::Value, crate::error::GaggleError> {
+    let mut results = Vec::with_capacity(files.len());
+    for f in files {
+        match download::get_dataset_file_path(dataset_path, f) {
+            Ok(path) => {
+                results.push(serde_json::json!({
+                    "name": f,
+                    "status": "ok",
+                    "path": path.to_string_lossy(),
+                }));
+            }
+            Err(e) => {
+                results.push(serde_json::json!({
+                    "name": f,
+                    "status": "error",
+                    "error": e.to_string(),
+                }));
+            }
+        }
+    }
+    Ok(serde_json::json!({"dataset": dataset_path, "files": results}))
 }
 
 #[cfg(test)]
@@ -311,10 +338,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_version_zero() {
-        let (_owner, _dataset, version) =
-            parse_dataset_path_with_version("owner/dataset@0").unwrap();
-        assert_eq!(version, Some("0".to_string()));
+    fn test_parse_version_zero_rejected() {
+        let result = parse_dataset_path_with_version("owner/dataset@0");
+        assert!(result.is_err());
+        if let Err(crate::error::GaggleError::InvalidDatasetPath(msg)) = result {
+            assert!(msg.contains("> 0"));
+        }
     }
 
     #[test]

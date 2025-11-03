@@ -5,10 +5,19 @@ use std::fs;
 static CREDENTIALS: once_cell::sync::Lazy<RwLock<Option<KaggleCredentials>>> =
     once_cell::sync::Lazy::new(|| RwLock::new(None));
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct KaggleCredentials {
     pub username: String,
     pub key: String,
+}
+
+impl std::fmt::Debug for KaggleCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KaggleCredentials")
+            .field("username", &self.username)
+            .field("key", &"***REDACTED***")
+            .finish()
+    }
 }
 
 /// Set Kaggle API credentials
@@ -63,9 +72,9 @@ pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
             })?;
             let mode = metadata.permissions().mode();
             if mode & 0o077 != 0 {
-                eprintln!(
-                    "Warning: kaggle.json has overly permissive permissions. \
-                     It should be readable only by the owner (chmod 600)."
+                tracing::warn!(
+                    path = %kaggle_json_path.display(),
+                    "kaggle.json has overly permissive permissions; it should be owner-readable only (chmod 600)"
                 );
             }
         }
@@ -204,10 +213,13 @@ mod tests {
     fn test_credentials_debug() {
         let creds = KaggleCredentials {
             username: "user".to_string(),
-            key: "key".to_string(),
+            key: "supersecret".to_string(),
         };
         let debug_str = format!("{:?}", creds);
         assert!(debug_str.contains("KaggleCredentials"));
+        assert!(debug_str.contains("user"));
+        assert!(!debug_str.contains("supersecret"));
+        assert!(debug_str.contains("REDACTED"));
     }
 
     #[test]

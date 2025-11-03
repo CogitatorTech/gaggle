@@ -138,3 +138,170 @@ fn test_download_and_version_with_mock() {
     env::remove_var("GAGGLE_CACHE_DIR");
     env::remove_var("GAGGLE_API_BASE");
 }
+
+#[test]
+#[serial_test::serial]
+fn test_single_file_fetch_on_demand() {
+    gaggle::init_logging();
+    let temp = tempfile::TempDir::new().unwrap();
+    env::set_var("GAGGLE_CACHE_DIR", temp.path());
+
+    let mut server = Server::new();
+    let server_url = server.url();
+    env::set_var("GAGGLE_API_BASE", &server_url);
+
+    // Set credentials
+    let user = CString::new("user").unwrap();
+    let key = CString::new("key").unwrap();
+    unsafe {
+        let _ = gaggle::gaggle_set_credentials(user.as_ptr(), key.as_ptr());
+    }
+
+    // Mock single-file endpoint
+    let _file = server
+        .mock("GET", "/datasets/download/owner/dataset")
+        .match_query(Matcher::UrlEncoded("fileName".into(), "data.csv".into()))
+        .with_status(200)
+        .with_header("content-type", "text/csv")
+        .with_body("a,b\n1,2\n")
+        .create();
+
+    // Act: request file path; should trigger on-demand fetch
+    let ds = CString::new("owner/dataset").unwrap();
+    let fnm = CString::new("data.csv").unwrap();
+    let ptr = unsafe { gaggle::gaggle_get_file_path(ds.as_ptr(), fnm.as_ptr()) };
+    assert!(!ptr.is_null());
+    let path = unsafe {
+        let s = CStr::from_ptr(ptr).to_str().unwrap().to_string();
+        gaggle::gaggle_free(ptr);
+        std::path::PathBuf::from(s)
+    };
+    assert!(path.exists());
+
+    // Ensure that full dataset extraction marker is not required for single-file presence
+    let ds_dir = temp.path().join("datasets/owner/dataset");
+    assert!(ds_dir.join("data.csv").exists());
+    // .downloaded marker may not exist yet (partial cache is allowed)
+
+    env::remove_var("GAGGLE_CACHE_DIR");
+    env::remove_var("GAGGLE_API_BASE");
+}
+
+#[test]
+#[serial_test::serial]
+fn test_strict_on_demand_no_fallback() {
+    gaggle::init_logging();
+    let temp = tempfile::TempDir::new().unwrap();
+    env::set_var("GAGGLE_CACHE_DIR", temp.path());
+    env::set_var("GAGGLE_STRICT_ONDEMAND", "1");
+
+    let mut server = Server::new();
+    let server_url = server.url();
+    env::set_var("GAGGLE_API_BASE", &server_url);
+
+    // Set credentials
+    let user = CString::new("user").unwrap();
+    let key = CString::new("key").unwrap();
+    unsafe {
+        let _ = gaggle::gaggle_set_credentials(user.as_ptr(), key.as_ptr());
+    }
+
+    // Mock single-file endpoint to return 404 (force failure)
+    let _file = server
+        .mock("GET", "/datasets/download/owner/dataset")
+        .match_query(Matcher::UrlEncoded("fileName".into(), "missing.csv".into()))
+        .with_status(404)
+        .with_header("content-type", "text/plain")
+        .with_body("not found")
+        .create();
+
+    // Act: request file path; should fail and not fall back to full download
+    let ds = CString::new("owner/dataset").unwrap();
+    let fnm = CString::new("missing.csv").unwrap();
+    let ptr = unsafe { gaggle::gaggle_get_file_path(ds.as_ptr(), fnm.as_ptr()) };
+    assert!(ptr.is_null());
+    let err_ptr = gaggle::gaggle_last_error();
+    assert!(!err_ptr.is_null());
+    let err = unsafe { CStr::from_ptr(err_ptr) }
+        .to_str()
+        .unwrap()
+        .to_lowercase();
+    assert!(err.contains("http"));
+
+    env::remove_var("GAGGLE_CACHE_DIR");
+    env::remove_var("GAGGLE_STRICT_ONDEMAND");
+    env::remove_var("GAGGLE_API_BASE");
+}
+
+#[test]
+#[serial_test::serial]
+fn test_prefetch_files_mixed_results() {
+    gaggle::init_logging();
+    let temp = tempfile::TempDir::new().unwrap();
+    env::set_var("GAGGLE_CACHE_DIR", temp.path());
+    env::set_var("GAGGLE_STRICT_ONDEMAND", "1");
+
+    let mut server = Server::new();
+    let server_url = server.url();
+    env::set_var("GAGGLE_API_BASE", &server_url);
+
+    // Set credentials
+    let user = CString::new("user").unwrap();
+    let key = CString::new("key").unwrap();
+    unsafe {
+        let _ = gaggle::gaggle_set_credentials(user.as_ptr(), key.as_ptr());
+    }
+
+    // Mock good file
+    let _good = server
+        .mock("GET", "/datasets/download/owner/dataset")
+        .match_query(Matcher::UrlEncoded("fileName".into(), "good.csv".into()))
+        .with_status(200)
+        .with_header("content-type", "text/csv")
+        .with_body("x\n1\n")
+        .create();
+
+    // Mock missing file
+    let _bad = server
+        .mock("GET", "/datasets/download/owner/dataset")
+        .match_query(Matcher::UrlEncoded("fileName".into(), "bad.csv".into()))
+        .with_status(404)
+        .with_body("not found")
+        .create();
+
+    // Call prefetch
+    let ds = CString::new("owner/dataset").unwrap();
+    let list = CString::new("good.csv\nbad.csv").unwrap();
+    let ptr = unsafe { gaggle::gaggle_prefetch_files(ds.as_ptr(), list.as_ptr()) };
+    assert!(!ptr.is_null());
+    let s = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
+    unsafe { gaggle::gaggle_free(ptr) };
+
+    let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+    assert_eq!(v["dataset"].as_str().unwrap(), "owner/dataset");
+    let files = v["files"].as_array().unwrap();
+    assert_eq!(files.len(), 2);
+
+    // Find statuses
+    let mut ok_seen = false;
+    let mut err_seen = false;
+    for f in files {
+        let name = f["name"].as_str().unwrap();
+        let status = f["status"].as_str().unwrap();
+        if name == "good.csv" {
+            assert_eq!(status, "ok");
+            assert!(f["path"].as_str().unwrap().ends_with("good.csv"));
+            ok_seen = true;
+        }
+        if name == "bad.csv" {
+            assert_eq!(status, "error");
+            assert!(!f["error"].as_str().unwrap().is_empty());
+            err_seen = true;
+        }
+    }
+    assert!(ok_seen && err_seen);
+
+    env::remove_var("GAGGLE_CACHE_DIR");
+    env::remove_var("GAGGLE_STRICT_ONDEMAND");
+    env::remove_var("GAGGLE_API_BASE");
+}

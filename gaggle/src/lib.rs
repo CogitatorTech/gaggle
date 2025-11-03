@@ -9,7 +9,8 @@ pub use ffi::{
     gaggle_clear_cache, gaggle_dataset_version_info, gaggle_download_dataset,
     gaggle_enforce_cache_limit, gaggle_free, gaggle_get_cache_info, gaggle_get_dataset_info,
     gaggle_get_file_path, gaggle_get_version, gaggle_is_dataset_current, gaggle_json_each,
-    gaggle_list_files, gaggle_search, gaggle_set_credentials, gaggle_update_dataset,
+    gaggle_list_files, gaggle_prefetch_files, gaggle_search, gaggle_set_credentials,
+    gaggle_update_dataset,
 };
 pub use kaggle::parse_dataset_path;
 pub use kaggle::parse_dataset_path_with_version;

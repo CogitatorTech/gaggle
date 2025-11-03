@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use super::api::{build_client, get_api_base, with_retries};
 use super::credentials::get_credentials;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Track ongoing dataset downloads to prevent concurrent downloads of the same dataset
 static DOWNLOAD_LOCKS: once_cell::sync::Lazy<Mutex<HashMap<String, ()>>> =
@@ -20,6 +20,28 @@ static DOWNLOAD_LOCKS: once_cell::sync::Lazy<Mutex<HashMap<String, ()>>> =
 pub struct DatasetFile {
     pub name: String,
     pub size: u64,
+}
+
+fn list_dataset_files_from_metadata(dataset_path: &str) -> Result<Vec<DatasetFile>, GaggleError> {
+    let meta = super::metadata::get_dataset_metadata(dataset_path)?;
+    let mut out = Vec::new();
+    if let Some(files) = meta.get("files").and_then(|v| v.as_array()) {
+        for f in files {
+            if let Some(name) = f.get("name").and_then(|n| n.as_str()) {
+                // support size keys in different schemas
+                let size = f
+                    .get("totalBytes")
+                    .and_then(|x| x.as_u64())
+                    .or_else(|| f.get("size").and_then(|x| x.as_u64()))
+                    .unwrap_or(0);
+                out.push(DatasetFile {
+                    name: name.to_string(),
+                    size,
+                });
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Metadata stored in .downloaded marker file
@@ -133,6 +155,10 @@ fn download_dataset_version(
 
     loop {
         let mut locks = DOWNLOAD_LOCKS.lock();
+        // While holding the lock, check marker existence to avoid race
+        if marker_file.exists() {
+            return Ok(cache_dir.clone());
+        }
         if !locks.contains_key(&lock_key) {
             locks.insert(lock_key.clone(), ());
             break;
@@ -152,11 +178,6 @@ fn download_dataset_version(
         }
 
         sleep(Duration::from_millis(poll_ms.max(1)));
-
-        // Check again if download completed while we waited
-        if marker_file.exists() {
-            return Ok(cache_dir);
-        }
     }
 
     // Ensure we clean up the lock when done
@@ -166,7 +187,7 @@ fn download_dataset_version(
 
     // Double-check after acquiring lock
     if marker_file.exists() {
-        return Ok(cache_dir);
+        return Ok(cache_dir.clone());
     }
 
     fs::create_dir_all(&cache_dir)?;
@@ -211,9 +232,20 @@ fn download_dataset_version(
         .map_err(|e| GaggleError::HttpRequestError(e.to_string()))?;
     writer.flush().ok();
 
-    // Extract ZIP - require at least one file extracted
-    let extracted = extract_zip(&zip_path, &cache_dir)?;
+    // Extract ZIP - require at least one file extracted; cleanup on failure
+    let extracted = match extract_zip(&zip_path, &cache_dir) {
+        Ok(n) => n,
+        Err(err) => {
+            // Best-effort cleanup of corrupt zip and partial files
+            let _ = fs::remove_file(&zip_path);
+            let _ = fs::remove_dir_all(&cache_dir);
+            return Err(err);
+        }
+    };
     if extracted == 0 {
+        // Clean up if nothing extracted
+        let _ = fs::remove_file(&zip_path);
+        let _ = fs::remove_dir_all(&cache_dir);
         return Err(GaggleError::ZipError("ZIP contained no files".to_string()));
     }
 
@@ -239,18 +271,100 @@ fn download_dataset_version(
     Ok(cache_dir)
 }
 
+/// Download a single file within a Kaggle dataset into the cache without extracting the entire archive
+pub fn download_single_file(dataset_path: &str, filename: &str) -> Result<PathBuf, GaggleError> {
+    // Validate dataset path and filename to prevent traversal
+    let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+    use std::path::Component;
+    let fname_path = Path::new(filename);
+    if fname_path.is_absolute() {
+        return Err(GaggleError::InvalidDatasetPath(
+            "Absolute filenames are not allowed".to_string(),
+        ));
+    }
+    for comp in fname_path.components() {
+        match comp {
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(GaggleError::InvalidDatasetPath(
+                    "Filename must not contain parent or root components".to_string(),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    // Offline mode: fail if file isn't already present
+    let base_dir = crate::config::cache_dir_runtime()
+        .join("datasets")
+        .join(&owner)
+        .join(&dataset);
+    let target_path = base_dir.join(fname_path);
+    if crate::config::offline_mode() {
+        if target_path.exists() {
+            return Ok(target_path);
+        }
+        return Err(GaggleError::HttpRequestError(format!(
+            "Offline mode enabled; cannot download '{}' from '{}'.",
+            filename, dataset_path
+        )));
+    }
+
+    // Ensure parent directories exist
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Build single-file download URL
+    // We use an endpoint shape that is easy to mock in tests and aligns with typical Kaggle CLI patterns
+    let url = format!(
+        "{}/datasets/download/{}/{}?fileName={}",
+        get_api_base(),
+        owner,
+        dataset,
+        urlencoding::encode(filename)
+    );
+
+    let creds = get_credentials()?;
+    debug!(%url, "downloading single file");
+    let client = build_client()?;
+    let mut response = with_retries(|| {
+        client
+            .get(&url)
+            .basic_auth(&creds.username, Some(&creds.key))
+            .send()
+            .map_err(|e| GaggleError::HttpRequestError(e.to_string()))
+    })?;
+
+    if !response.status().is_success() {
+        return Err(GaggleError::HttpRequestError(format!(
+            "Failed to download file '{}': HTTP {}",
+            filename,
+            response.status()
+        )));
+    }
+
+    // Stream to disk; avoid loading whole file into memory
+    let mut outfile = fs::File::create(&target_path)?;
+    response
+        .copy_to(&mut outfile)
+        .map_err(|e| GaggleError::HttpRequestError(e.to_string()))?;
+
+    Ok(target_path)
+}
+
 /// Extract ZIP file
 pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, GaggleError> {
     let file = fs::File::open(zip_path)?;
     let mut archive =
         zip::ZipArchive::new(file).map_err(|e| GaggleError::ZipError(e.to_string()))?;
 
-    // ZIP bomb protection: limit total uncompressed size to 10GB
+    // ZIP bomb protection: limit total uncompressed size to 10GB and compression ratio
     const MAX_TOTAL_SIZE: u64 = 10 * 1024 * 1024 * 1024;
+    const MAX_COMPRESSION_RATIO: u64 = 100; // reject entries with >100:1 ratio
     let mut total_size: u64 = 0;
     let mut files_extracted: usize = 0;
 
-    // Ensure destination directory exists and canonicalize it for comparisons
+    // Ensure destination directory exists and canonicalize it once
     fs::create_dir_all(dest_dir)?;
     let canonical_dest = dest_dir.canonicalize().map_err(|e| {
         GaggleError::IoError(format!(
@@ -284,12 +398,18 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
             }
         };
 
+        // Compute output path and validate parent within dest (no dir creation before validation)
         let outpath = dest_dir.join(&rel_path);
-
-        // Validate the output path is still within dest_dir using canonical parent
         let parent = outpath.parent().unwrap_or(dest_dir);
-        fs::create_dir_all(parent)?;
-        let canonical_parent = parent.canonicalize().map_err(|e| {
+        // Validate the output path is still within dest_dir using canonical parent
+        // Create parent only after validation
+        let canonical_parent_candidate = if parent.exists() {
+            parent.canonicalize()
+        } else {
+            // If parent doesn't exist yet, use canonical dest and join the relative path's parent
+            Ok(canonical_dest.clone())
+        };
+        let canonical_parent = canonical_parent_candidate.map_err(|e| {
             GaggleError::ZipError(format!(
                 "Failed to canonicalize parent directory for {}: {}",
                 rel_path.display(),
@@ -303,18 +423,31 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
             )));
         }
 
+        // Directory entries
         if entry.is_dir() || entry.name().ends_with('/') {
             fs::create_dir_all(&outpath)?;
             continue;
         }
 
-        // Check total uncompressed size
-        total_size = total_size.saturating_add(entry.size());
+        // Check total uncompressed size and per-entry compression ratio if possible
+        let uncompressed = entry.size();
+        total_size = total_size.saturating_add(uncompressed);
         if total_size > MAX_TOTAL_SIZE {
             return Err(GaggleError::ZipError(format!(
                 "ZIP file too large: uncompressed size exceeds {} GB",
                 MAX_TOTAL_SIZE / (1024 * 1024 * 1024)
             )));
+        }
+        let comp_size = entry.compressed_size();
+        if comp_size > 0 {
+            let ratio = uncompressed.saturating_div(comp_size.max(1));
+            if ratio > MAX_COMPRESSION_RATIO {
+                return Err(GaggleError::ZipError(format!(
+                    "Excessive compression ratio ({}:1) for entry {}",
+                    ratio,
+                    rel_path.display()
+                )));
+            }
         }
 
         // Finally, write the file
@@ -329,15 +462,68 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
     Ok(files_extracted)
 }
 
-/// List files in a downloaded dataset
+/// List files in a dataset. If cached locally, list from disk. Otherwise, try remote metadata-based listing first,
+/// and only fall back to downloading if remote listing is unavailable.
 pub fn list_dataset_files(dataset_path: &str) -> Result<Vec<DatasetFile>, GaggleError> {
+    let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+    let dataset_dir = crate::config::cache_dir_runtime()
+        .join("datasets")
+        .join(&owner)
+        .join(&dataset);
+
+    // If directory exists and has content, enumerate locally
+    if dataset_dir.exists() {
+        let mut files = Vec::new();
+        for entry in fs::read_dir(&dataset_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(file_name) = path.file_name() {
+                    if file_name != ".downloaded" {
+                        let metadata = fs::metadata(&path)?;
+                        if let Some(name) = path.file_name() {
+                            files.push(DatasetFile {
+                                name: name.to_string_lossy().to_string(),
+                                size: metadata.len(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(files);
+    }
+
+    // Not cached: try remote listing via metadata
+    if !crate::config::offline_mode() {
+        if let Ok(list) = list_dataset_files_from_metadata(dataset_path) {
+            if !list.is_empty() {
+                debug!(
+                    dataset = dataset_path,
+                    count = list.len(),
+                    "listing files from remote metadata"
+                );
+                return Ok(list);
+            } else {
+                debug!(
+                    dataset = dataset_path,
+                    "remote metadata listing empty; will attempt download"
+                );
+            }
+        } else {
+            debug!(
+                dataset = dataset_path,
+                "failed to fetch remote metadata; will attempt download"
+            );
+        }
+    }
+
+    // As a last resort, download and list
     let dataset_dir = download_dataset(dataset_path)?;
     let mut files = Vec::new();
-
     for entry in fs::read_dir(&dataset_dir)? {
         let entry = entry?;
         let path = entry.path();
-
         if path.is_file() {
             if let Some(file_name) = path.file_name() {
                 if file_name != ".downloaded" {
@@ -352,7 +538,6 @@ pub fn list_dataset_files(dataset_path: &str) -> Result<Vec<DatasetFile>, Gaggle
             }
         }
     }
-
     Ok(files)
 }
 
@@ -377,17 +562,44 @@ pub fn get_dataset_file_path(dataset_path: &str, filename: &str) -> Result<PathB
         }
     }
 
-    let dataset_dir = download_dataset(dataset_path)?;
+    // Compute dataset dir and desired file path
+    let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
+    let dataset_dir = crate::config::cache_dir_runtime()
+        .join("datasets")
+        .join(&owner)
+        .join(&dataset);
     let file_path = dataset_dir.join(fname_path);
 
-    if !file_path.exists() {
-        return Err(GaggleError::IoError(format!(
-            "File '{}' not found in dataset '{}'",
-            filename, dataset_path
-        )));
+    // Fast path: file already present
+    if file_path.exists() {
+        return Ok(file_path);
     }
 
-    Ok(file_path)
+    // Try on-demand single-file download (without fetching whole archive)
+    match download_single_file(dataset_path, filename) {
+        Ok(p) => Ok(p),
+        Err(e) => {
+            // In strict on-demand mode, do not fall back to full download
+            if crate::config::strict_on_demand() {
+                debug!(dataset = dataset_path, file = filename, error = %e, "on-demand fetch failed and strict mode enabled; not falling back");
+                return Err(e);
+            }
+            // If single-file download fails and dataset isn't cached, fall back to full dataset download
+            if !dataset_dir.exists()
+                || fs::read_dir(&dataset_dir)
+                    .map(|mut i| i.next().is_none())
+                    .unwrap_or(true)
+            {
+                debug!(dataset = dataset_path, file = filename, error = %e, "on-demand fetch failed; falling back to full dataset download");
+                let dir = download_dataset(dataset_path)?;
+                let p = dir.join(fname_path);
+                if p.exists() {
+                    return Ok(p);
+                }
+            }
+            Err(e)
+        }
+    }
 }
 
 /// Get all cached datasets with their metadata
@@ -423,8 +635,9 @@ fn get_cached_datasets() -> Result<Vec<(PathBuf, CacheMetadata)>, GaggleError> {
                             Ok(metadata) => {
                                 datasets.push((dataset_path, metadata));
                             }
-                            Err(_) => {
-                                // Legacy marker without metadata - calculate size
+                            Err(e) => {
+                                // Legacy or invalid marker - calculate size and synthesize metadata
+                                warn!(path = %marker_file.display(), error = %e, "Invalid cache metadata; synthesizing");
                                 let size_mb = crate::utils::calculate_dir_size(&dataset_path)
                                     .unwrap_or(0)
                                     .saturating_div(1024 * 1024);
@@ -433,13 +646,46 @@ fn get_cached_datasets() -> Result<Vec<(PathBuf, CacheMetadata)>, GaggleError> {
                                     dataset_entry.file_name().to_string_lossy().to_string();
                                 let metadata =
                                     CacheMetadata::new(format!("{}/{}", owner, dataset), size_mb);
+                                // retain None version
                                 datasets.push((dataset_path, metadata));
                             }
                         }
                     }
-                    _ => {
-                        // Empty or unreadable marker - skip
+                    Ok(_) => {
+                        // Empty marker - synthesize
+                        warn!(path = %marker_file.display(), "Empty cache metadata; synthesizing");
+                        let size_mb = crate::utils::calculate_dir_size(&dataset_path)
+                            .unwrap_or(0)
+                            .saturating_div(1024 * 1024);
+                        let owner = owner_entry.file_name().to_string_lossy().to_string();
+                        let dataset = dataset_entry.file_name().to_string_lossy().to_string();
+                        let metadata =
+                            CacheMetadata::new(format!("{}/{}", owner, dataset), size_mb);
+                        datasets.push((dataset_path, metadata));
                     }
+                    Err(e) => {
+                        warn!(path = %marker_file.display(), error = %e, "Failed reading cache metadata; synthesizing");
+                        let size_mb = crate::utils::calculate_dir_size(&dataset_path)
+                            .unwrap_or(0)
+                            .saturating_div(1024 * 1024);
+                        let owner = owner_entry.file_name().to_string_lossy().to_string();
+                        let dataset = dataset_entry.file_name().to_string_lossy().to_string();
+                        let metadata =
+                            CacheMetadata::new(format!("{}/{}", owner, dataset), size_mb);
+                        datasets.push((dataset_path, metadata));
+                    }
+                }
+            } else {
+                // No marker (e.g., partial on-demand downloads). Include in accounting.
+                let size_mb = crate::utils::calculate_dir_size(&dataset_path)
+                    .unwrap_or(0)
+                    .saturating_div(1024 * 1024);
+                // Skip empty directories with zero size
+                if size_mb > 0 {
+                    let owner = owner_entry.file_name().to_string_lossy().to_string();
+                    let dataset = dataset_entry.file_name().to_string_lossy().to_string();
+                    let metadata = CacheMetadata::new(format!("{}/{}", owner, dataset), size_mb);
+                    datasets.push((dataset_path, metadata));
                 }
             }
         }
@@ -479,19 +725,16 @@ fn enforce_cache_limit() -> Result<(), GaggleError> {
 
         // Remove dataset directory
         if let Err(e) = fs::remove_dir_all(&dataset_path) {
-            eprintln!(
-                "Warning: Failed to evict dataset {}: {}",
-                metadata.dataset_path, e
-            );
+            warn!(path = %dataset_path.display(), error = %e, "Failed to evict dataset");
             continue;
         }
 
         total_size_mb = total_size_mb.saturating_sub(metadata.size_mb);
-        eprintln!(
-            "Cache limit enforcement: Evicted {} (age: {}s, size: {}MB)",
-            metadata.dataset_path,
-            metadata.age_seconds(),
-            metadata.size_mb
+        debug!(
+            dataset = %metadata.dataset_path,
+            age_secs = metadata.age_seconds(),
+            size_mb = metadata.size_mb,
+            "Cache eviction: removed dataset to enforce limit"
         );
     }
 
@@ -530,6 +773,11 @@ pub fn is_dataset_current(dataset_path: &str) -> Result<bool, GaggleError> {
 
     // Get current version from Kaggle
     let current_version = super::metadata::get_current_version(dataset_path)?;
+
+    // If we cannot determine current version, conservatively report not current
+    if current_version == "unknown" {
+        return Ok(false);
+    }
 
     Ok(cached_version == current_version)
 }
@@ -579,10 +827,15 @@ pub fn get_dataset_version_info(dataset_path: &str) -> Result<serde_json::Value,
     // Get current version from Kaggle API
     let current_version = super::metadata::get_current_version(dataset_path)?;
 
-    let is_current = cached_version
-        .as_ref()
-        .map(|v| v == &current_version)
-        .unwrap_or(false);
+    // Consider unknown latest version as not current
+    let is_current = if current_version == "unknown" {
+        false
+    } else {
+        cached_version
+            .as_ref()
+            .map(|v| v == &current_version)
+            .unwrap_or(false)
+    };
 
     let info = serde_json::json!({
         "cached_version": cached_version,
@@ -823,7 +1076,7 @@ mod tests {
     fn test_list_dataset_files_skips_marker() {
         // This test requires mocking or a real download, which is complex
         // For now, we test the structure of DatasetFile
-        let files = vec![
+        let files = [
             DatasetFile {
                 name: "data.csv".to_string(),
                 size: 1000,
@@ -1057,6 +1310,31 @@ mod tests {
         assert_ne!(latest_cache, v3_cache);
         assert_ne!(v2_cache, v3_cache);
 
+        std::env::remove_var("GAGGLE_CACHE_DIR");
+    }
+
+    #[test]
+    fn test_partial_cache_counts_and_eviction() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
+
+        // Create two partial cached datasets
+        let d1 = temp_dir.path().join("datasets/owner1/ds1");
+        let d2 = temp_dir.path().join("datasets/owner2/ds2");
+        fs::create_dir_all(&d1).unwrap();
+        fs::create_dir_all(&d2).unwrap();
+        fs::write(d1.join("a.bin"), vec![0u8; 2 * 1024 * 1024]).unwrap(); // 2MB
+        fs::write(d2.join("b.bin"), vec![0u8; 2 * 1024 * 1024]).unwrap(); // 2MB
+
+        // Total ~4MB; set limit to 2MB so eviction must occur
+        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "2");
+        enforce_cache_limit_now().unwrap();
+
+        // After eviction, total size must be <= 2MB
+        let total = get_total_cache_size_mb().unwrap();
+        assert!(total <= 2);
+
+        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
         std::env::remove_var("GAGGLE_CACHE_DIR");
     }
 }
