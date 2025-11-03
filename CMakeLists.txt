@@ -241,3 +241,26 @@ if(_GAGGLE_FS_LIB)
     target_link_libraries(${LOADABLE_EXTENSION_NAME} ${_GAGGLE_FS_LIB})
   endif()
 endif()
+
+# Attempt to find liblzma (vcpkg port 'xz') and link it if available.
+# We do NOT mark it REQUIRED so standalone configure (without vcpkg/toolchain) still succeeds.
+find_package(xz CONFIG)
+if(NOT xz_FOUND)
+  message(STATUS "[gaggle] xz (liblzma) not found by find_package; skipping link. If using vcpkg, configure CMake with -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake")
+endif()
+
+if(TARGET xz::xz)
+  if (TARGET ${EXTENSION_NAME})
+    target_link_libraries(${EXTENSION_NAME} PRIVATE xz::xz)
+  endif()
+  if (TARGET ${LOADABLE_EXTENSION_NAME})
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} PRIVATE xz::xz)
+  endif()
+  if (TARGET gaggle)
+    target_link_libraries(gaggle PRIVATE xz::xz)
+  endif()
+  if (TARGET gaggle-static)
+    target_link_libraries(gaggle-static PRIVATE xz::xz)
+  endif()
+endif()
+
