@@ -53,7 +53,7 @@ Replacement scan (transparent table read):
 -- Load the Gaggle extension
 load 'build/release/extension/gaggle/gaggle.duckdb_extension';
 
--- Set Kaggle credentials (or read fron environment variables or from `~/.kaggle/kaggle.json` file)
+-- Set Kaggle credentials (or read from environment variables or from `~/.kaggle/kaggle.json` file)
 select gaggle_set_credentials('your-username', 'your-api-key');
 
 -- Check version

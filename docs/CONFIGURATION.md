@@ -21,7 +21,6 @@ Gaggle supports configuration via environment variables to customize its behavio
 - **Description**: Maximum cache size in megabytes for downloaded datasets
 - **Type**: Integer (megabytes) or "unlimited"
 - **Default**: `102400` (100GB)
-- **Status**: ✅ Implemented
 - **Behavior**: Uses soft limit by default - downloads complete even if they exceed the limit, then oldest datasets are
   automatically evicted using LRU (Least Recently Used) policy
 - **Example**:
@@ -41,7 +40,6 @@ Gaggle supports configuration via environment variables to customize its behavio
 - **Description**: Enable hard limit mode (prevents downloads when cache limit would be exceeded)
 - **Type**: Boolean (true/yes/1 or false/no/0)
 - **Default**: `false` (soft limit)
-- **Status**: ✅ Implemented
 - **Example**:
   ```bash
   ##  Enable hard limit (prevents downloads when cache is full)
@@ -139,9 +137,8 @@ These settings control the wait behavior when a download is already in progress.
 ######  GAGGLE_LOG_LEVEL
 
 - **Description**: Set logging level for structured logs emitted by the Rust core (via tracing)
-- **Type**: String (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`); case-insensitive
+- **Type**: String (`ERROR`, `WARN`, `INFO`, `DEBUG`, and `TRACE`); case-insensitive
 - **Default**: `WARN`
-- **Status**: ✅ Implemented
 - **Example**:
   ```bash
   export GAGGLE_LOG_LEVEL=INFO
@@ -172,7 +169,7 @@ These settings control the wait behavior when a download is already in progress.
 #####  On-Demand Download Behavior
 
 - **GAGGLE_STRICT_ONDEMAND**
-    - **Description**: When enabled, `gaggle_get_file_path` will NOT fall back to a full dataset download if the single-file request fails.
+    - **Description**: When enabled, `gaggle_file_path` will NOT fall back to a full dataset download if the single-file request fails.
     - **Type**: Boolean (`1`, `true`, `yes`, `on` to enable)
     - **Default**: `false`
 

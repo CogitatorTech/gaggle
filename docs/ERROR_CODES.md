@@ -2,7 +2,7 @@
 
 Gaggle uses standardized error codes to make error handling more predictable and debugging easier.
 Each error includes a numeric code (E001 to E010) that can be used programmatically.
-When troubleshooting, look for the bracketed code (like [E003]) and refer to the corresponding section below.
+When troubleshooting, look for the bracketed code (like \[E003\]) and refer to the corresponding section below.
 
 #### Error Code Format
 

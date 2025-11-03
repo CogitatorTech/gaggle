@@ -740,7 +740,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 // Provide out-of-line definitions for the extension class
 void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
 std::string GaggleExtension::Name() { return "gaggle"; }
-std::string GaggleExtension::Version() const { return std::string("0.1.0-alpha.2"); }
+std::string GaggleExtension::Version() const { return std::string("0.1.0-alpha.3"); }
 
 } // namespace duckdb
 
