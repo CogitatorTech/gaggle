@@ -72,21 +72,19 @@ It outlines features to be implemented and their current status.
 ### 6. Documentation and Distribution
 
 * **Documentation**
-    * [x] API reference in README.md.
-    * [x] Usage examples (see `docs/examples/`).
-    * [ ] Tutorial documentation.
-    * [ ] FAQ section.
-    * [ ] Troubleshooting guide.
+    * [x] API reference (see `docs/README.md`).
+    * [x] Usage examples (see the files in `docs/examples/`).
+    * [x] Other documentation files like the list of errors (check out `docs/` directory).
 * **Testing**
-    * [x] Unit tests for core modules (Rust).
-    * [x] SQL integration tests (DuckDB shell).
-    * [x] End-to-end integration tests with mocked HTTP (basic coverage).
+    * [x] Unit tests for core (Rust) modules.
+    * [x] SQL integration tests (run in DuckDB shell).
+    * [x] End-to-end integration tests with mocked HTTP.
     * [ ] Performance benchmarks.
 * **Distribution**
-    * [ ] Pre-compiled extension binaries for Linux, macOS, and Windows.
-    * [ ] Submission to the DuckDB Community Extensions repository.
+    * [x] Built binaries for Linux, macOS, and Windows; AMD64 and ARM64.
+    * [x] Submission to the DuckDB's community extensions repository.
 
 ### 7. Observability
 
 * **Logging**
-    * [x] Structured logging via `tracing` with `GAGGLE_LOG_LEVEL`.
+    * [x] Structured logging (configurable via `GAGGLE_LOG_LEVEL` environment variable).

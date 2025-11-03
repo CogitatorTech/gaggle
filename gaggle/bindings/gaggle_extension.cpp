@@ -544,7 +544,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
   };
 
   if (is_dir || has_wildcard) {
-    // Ensure dataset is downloaded and construct a glob path
+    // Verify that the dataset is downloaded and construct a glob path
     char *dir_c = gaggle_download_dataset(dataset_path.c_str());
     if (!dir_c) {
       throw InvalidInputException("Failed to prepare dataset directory: " +
@@ -609,7 +609,7 @@ static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
   }
   result->dataset_path = input.inputs[0].ToString();
 
-  // Ensure dataset is downloaded and get directory
+  // Verify that the dataset is downloaded and get directory
   char *dir_c = gaggle_download_dataset(result->dataset_path.c_str());
   if (!dir_c) {
     throw InvalidInputException("Failed to download dataset: " +

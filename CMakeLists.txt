@@ -1,33 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
 
-# ==============================================================================
-# Build xz submodule (liblzma) FIRST - before anything else
-# ==============================================================================
-# This must be done early so the liblzma target is available when
-# extension_config.cmake is included by DuckDB's build system
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
-set(XZ_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared liblzma" FORCE)
-set(XZ_BUILD_STATIC_LIBS ON CACHE BOOL "Build static liblzma" FORCE)
-# Disable building unnecessary tools
-set(XZ_BUILD_XZ OFF CACHE BOOL "Build xz tool" FORCE)
-set(XZ_BUILD_XZDEC OFF CACHE BOOL "Build xzdec tool" FORCE)
-set(XZ_BUILD_LZMADEC OFF CACHE BOOL "Build lzmadec tool" FORCE)
-set(XZ_BUILD_LZMAINFO OFF CACHE BOOL "Build lzmainfo tool" FORCE)
-set(XZ_BUILD_SCRIPTS OFF CACHE BOOL "Build scripts" FORCE)
-# Disable NLS (Native Language Support) to reduce dependencies
-set(XZ_NLS OFF CACHE BOOL "Enable Native Language Support" FORCE)
-
-# Add the xz submodule to the build
-if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/external/xz/CMakeLists.txt)
-    add_subdirectory(external/xz EXCLUDE_FROM_ALL)
-    # Create an alias target for easier linking
-    if(TARGET liblzma)
-        add_library(xz::lzma ALIAS liblzma)
-        message(STATUS "[gaggle] XZ Utils (liblzma) added from submodule")
-    endif()
-else()
-    message(WARNING "[gaggle] XZ submodule not found at external/xz - using system lzma")
-endif()
 
 set(CORROSION_VERBOSE_OUTPUT ON)
 

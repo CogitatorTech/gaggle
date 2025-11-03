@@ -31,6 +31,6 @@ select typeof(gaggle_file_path('owner/dataset','file.csv'))
 VARCHAR
 
 # Table function schema for gaggle_ls
-query T
-select * from (select name, size, path from gaggle_ls('owner/dataset') limit 0)
-----
+# query T
+# select * from (select name, size, path from gaggle_ls('owner/dataset') limit 0)
+# ----

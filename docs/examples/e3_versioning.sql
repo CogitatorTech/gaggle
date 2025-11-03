@@ -80,7 +80,7 @@ select
 ;
 
 -- Section 9: Data pipeline with version validation
-select '## Data pipeline: ensure latest data before querying';
+select '## Data pipeline: make sure the latest version is retrieved before querying';
 -- Step 1: Validate version
 with validation as (
     select gaggle_is_current('uciml/iris') as is_current

@@ -22,10 +22,6 @@ Example:
 
 ##### E001 - Invalid Credentials
 
-**Category:** Authentication  
-**Code:** `E001`  
-**Type:** `CredentialsError`
-
 **Description:**  
 Kaggle API credentials are invalid, missing, or incorrectly formatted.
 
@@ -51,10 +47,6 @@ Kaggle API credentials are invalid, missing, or incorrectly formatted.
 ---
 
 ##### E002 - Dataset Not Found
-
-**Category:** Dataset  
-**Code:** `E002`  
-**Type:** `DatasetNotFound`
 
 **Description:**  
 The requested dataset does not exist on Kaggle or is not accessible.
@@ -84,16 +76,12 @@ The requested dataset does not exist on Kaggle or is not accessible.
    ```
 
 3. **Check dataset availability:**
-    - Ensure dataset is public
+    - Check dataset is public
     - Verify you have access rights
 
 ---
 
 ##### E003 - Network Error
-
-**Category:** Network  
-**Code:** `E003`  
-**Type:** `HttpRequestError`
 
 **Description:**  
 Network error occurred during communication with Kaggle API.
@@ -135,16 +123,12 @@ Network error occurred during communication with Kaggle API.
    ```
 
 5. **Check firewall settings:**
-    - Ensure outbound HTTPS (port 443) is allowed
+    - Check outbound HTTPS (port 443) is allowed
     - Check corporate proxy settings
 
 ---
 
 ##### E004 - Invalid Path
-
-**Category:** Validation  
-**Code:** `E004`  
-**Type:** `InvalidDatasetPath`
 
 **Description:**  
 Dataset path format is invalid or contains forbidden characters.
@@ -193,10 +177,6 @@ owner/.              # Dot component
 ---
 
 ##### E005 - File System Error
-
-**Category:** I/O  
-**Code:** `E005`  
-**Type:** `IoError`
 
 **Description:**  
 Error reading from or writing to the file system.
@@ -247,10 +227,6 @@ Error reading from or writing to the file system.
 
 ##### E006 - JSON Error
 
-**Category:** Serialization  
-**Code:** `E006`  
-**Type:** `JsonError`
-
 **Description:**  
 Error parsing or serializing JSON data.
 
@@ -287,10 +263,6 @@ Error parsing or serializing JSON data.
 ---
 
 ##### E007 - ZIP Extraction Error
-
-**Category:** Archive  
-**Code:** `E007`  
-**Type:** `ZipError`
 
 **Description:**  
 Error extracting downloaded ZIP file.
@@ -334,10 +306,6 @@ Error extracting downloaded ZIP file.
 
 ##### E008 - CSV Parsing Error
 
-**Category:** Parsing  
-**Code:** `E008`  
-**Type:** `CsvError`
-
 **Description:**  
 Error parsing CSV file format.
 
@@ -379,10 +347,6 @@ Error parsing CSV file format.
 
 ##### E009 - UTF-8 Encoding Error
 
-**Category:** Encoding  
-**Code:** `E009`  
-**Type:** `Utf8Error`
-
 **Description:**  
 String is not valid UTF-8.
 
@@ -419,10 +383,6 @@ String is not valid UTF-8.
 ---
 
 ##### E010 - Null Pointer Error
-
-**Category:** FFI  
-**Code:** `E010`  
-**Type:** `NullPointer`
 
 **Description:**  
 NULL pointer passed to FFI function.

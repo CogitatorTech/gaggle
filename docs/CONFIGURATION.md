@@ -1,12 +1,12 @@
-###  Gaggle's Configuration Guide
+### Gaggle's Configuration Guide
 
 Gaggle supports configuration via environment variables to customize its behavior without code changes.
 
-####  Environment Variables
+#### Environment Variables
 
-#####  Cache Configuration
+##### Cache Configuration
 
-######  GAGGLE_CACHE_DIR
+###### GAGGLE_CACHE_DIR
 
 - **Description**: Directory path for caching downloaded Kaggle datasets
 - **Type**: String (path)
@@ -16,7 +16,7 @@ Gaggle supports configuration via environment variables to customize its behavio
   export GAGGLE_CACHE_DIR="/var/cache/gaggle"
   ```
 
-######  GAGGLE_CACHE_SIZE_LIMIT_MB
+###### GAGGLE_CACHE_SIZE_LIMIT
 
 - **Description**: Maximum cache size in megabytes for downloaded datasets
 - **Type**: Integer (megabytes) or "unlimited"
@@ -25,30 +25,30 @@ Gaggle supports configuration via environment variables to customize its behavio
   automatically evicted using LRU (Least Recently Used) policy
 - **Example**:
   ```bash
-  ##  Set to 50GB
-  export GAGGLE_CACHE_SIZE_LIMIT_MB=51200
+  ## Set to 50GB
+  export GAGGLE_CACHE_SIZE_LIMIT=51200
 
-  ##  Set to 5GB
-  export GAGGLE_CACHE_SIZE_LIMIT_MB=5120
+  ## Set to 5GB
+  export GAGGLE_CACHE_SIZE_LIMIT=5120
 
-  ##  Set unlimited cache
-  export GAGGLE_CACHE_SIZE_LIMIT_MB=unlimited
+  ## Set unlimited cache
+  export GAGGLE_CACHE_SIZE_LIMIT=unlimited
   ```
 
-######  GAGGLE_CACHE_HARD_LIMIT
+###### GAGGLE_CACHE_HARD_LIMIT
 
 - **Description**: Enable hard limit mode (prevents downloads when cache limit would be exceeded)
 - **Type**: Boolean (true/yes/1 or false/no/0)
 - **Default**: `false` (soft limit)
 - **Example**:
   ```bash
-  ##  Enable hard limit (prevents downloads when cache is full)
+  ## Enable hard limit (prevents downloads when cache is full)
   export GAGGLE_CACHE_HARD_LIMIT=true
   ```
 
-#####  HTTP Configuration
+##### HTTP Configuration
 
-######  GAGGLE_HTTP_TIMEOUT
+###### GAGGLE_HTTP_TIMEOUT
 
 - **Description**: HTTP request timeout in seconds for Kaggle API requests
 - **Type**: Integer (seconds)
@@ -58,18 +58,18 @@ Gaggle supports configuration via environment variables to customize its behavio
   export GAGGLE_HTTP_TIMEOUT=120
   ```
 
-######  GAGGLE_API_BASE
+###### GAGGLE_API_BASE
 
 - **Description**: Override the Kaggle API base URL (primarily for testing/mocking)
 - **Type**: String (URL)
 - **Default**: `https://www.kaggle.com/api/v1`
 - **Example**:
   ```bash
-  ##  Point requests to a local mock server
+  ## Point requests to a local mock server
   export GAGGLE_API_BASE=http://127.0.0.1:12345
   ```
 
-######  HTTP Retry Controls
+###### HTTP Retry Controls
 
 - **GAGGLE_HTTP_RETRY_ATTEMPTS**
     - **Description**: Number of retry attempts after the initial try
@@ -86,19 +86,19 @@ Gaggle supports configuration via environment variables to customize its behavio
 
 These controls enable exponential backoff with cap across metadata/search/download requests.
 
-######  GAGGLE_API_MIN_INTERVAL_MS
+###### GAGGLE_API_MIN_INTERVAL_MS
 
 - **Description**: Optional client-side rate limiting. Enforces a minimum interval between HTTP calls.
 - **Type**: Integer (milliseconds)
 - **Default**: `0` (disabled)
 - **Example**:
   ```bash
-  export GAGGLE_API_MIN_INTERVAL_MS=200   ##  max 5 calls/sec per process
+  export GAGGLE_API_MIN_INTERVAL_MS=200   ## max 5 calls/sec per process
   ```
 
-#####  Metadata Caching
+##### Metadata Caching
 
-######  GAGGLE_METADATA_TTL
+###### GAGGLE_METADATA_TTL
 
 - **Description**: In-memory cache TTL for dataset metadata responses.
 - **Type**: Integer (seconds)
@@ -108,7 +108,7 @@ These controls enable exponential backoff with cap across metadata/search/downlo
   export GAGGLE_METADATA_TTL=300
   ```
 
-#####  Download Coordination
+##### Download Coordination
 
 When multiple queries attempt to download the same dataset concurrently, Gaggle coordinates using an in-process lock.
 These settings control the wait behavior when a download is already in progress.
@@ -119,22 +119,22 @@ These settings control the wait behavior when a download is already in progress.
     - **Default**: `30`
     - **Example**:
       ```bash
-      export GAGGLE_DOWNLOAD_WAIT_TIMEOUT=600 ##  10 minutes
+      export GAGGLE_DOWNLOAD_WAIT_TIMEOUT=600 ## 10 minutes
       ```
 - **GAGGLE_DOWNLOAD_WAIT_POLL**
     - **Description**: Polling interval while waiting (seconds)
     - **Type**: Float or integer (seconds)
     - **Default**: `0.1`
 
-#####  Logging Configuration
+##### Logging Configuration
 
-######  GAGGLE_VERBOSE
+###### GAGGLE_VERBOSE
 
 - **Description**: Enable verbose logging (boolean)
 - **Type**: Boolean (1/true/yes/on or 0/false/no/off)
 - **Default**: `false`
 
-######  GAGGLE_LOG_LEVEL
+###### GAGGLE_LOG_LEVEL
 
 - **Description**: Set logging level for structured logs emitted by the Rust core (via tracing)
 - **Type**: String (`ERROR`, `WARN`, `INFO`, `DEBUG`, and `TRACE`); case-insensitive
@@ -149,7 +149,7 @@ These settings control the wait behavior when a download is already in progress.
       is called). The environment variable is read once per process.
     - Logs include a level prefix and optional ANSI colors if stderr is a terminal.
 
-#####  Offline Mode
+##### Offline Mode
 
 - **GAGGLE_OFFLINE**
     - **Description**: Disable network access. When enabled, operations that require network will fail fast unless data
@@ -166,99 +166,99 @@ These settings control the wait behavior when a download is already in progress.
       export GAGGLE_OFFLINE=1
       ```
 
-#####  On-Demand Download Behavior
+##### On-Demand Download Behavior
 
 - **GAGGLE_STRICT_ONDEMAND**
     - **Description**: When enabled, `gaggle_file_path` will NOT fall back to a full dataset download if the single-file request fails.
     - **Type**: Boolean (`1`, `true`, `yes`, `on` to enable)
     - **Default**: `false`
 
-####  Usage Examples
+#### Usage Examples
 
-#####  Example 1: Custom Cache Directory
+##### Example 1: Custom Cache Directory
 
 ```bash
-###  Set custom cache directory
+### Set custom cache directory
 export GAGGLE_CACHE_DIR="/mnt/fast-ssd/kaggle-cache"
 
-###  Start DuckDB
+### Start DuckDB
 ./build/release/duckdb
 
-###  Check configuration
+### Check configuration
 SELECT gaggle_search('iris', 1, 10);
 ```
 
-#####  Example 2: Larger Cache for Big Datasets
+##### Example 2: Larger Cache for Big Datasets
 
 ```bash
-##  Set cache to 50GB for large datasets
-export GAGGLE_CACHE_SIZE_LIMIT_MB=51200
+## Set cache to 50GB for large datasets
+export GAGGLE_CACHE_SIZE_LIMIT=51200
 
-##  Download and query large Kaggle datasets
+## Download and query large Kaggle datasets
 ./build/release/duckdb
 ```
 
-#####  Example 3: Production Configuration
+##### Example 3: Production Configuration
 
 ```bash
-##  Complete production configuration
+## Complete production configuration
 export GAGGLE_CACHE_DIR="/var/lib/gaggle/cache"
-export GAGGLE_CACHE_SIZE_LIMIT_MB=51200     ##  50GB
-export GAGGLE_HTTP_TIMEOUT=120              ##  2 minutes
-export GAGGLE_HTTP_RETRY_ATTEMPTS=5         ##  Retry up to 5 times
-export GAGGLE_HTTP_RETRY_DELAY=2            ##  2 second initial delay
-export GAGGLE_HTTP_RETRY_MAX_DELAY=30       ##  Cap backoff at 30s
-export GAGGLE_LOG_LEVEL=WARN                ##  Production logging
+export GAGGLE_CACHE_SIZE_LIMIT=51200     ## 50GB
+export GAGGLE_HTTP_TIMEOUT=120              ## 2 minutes
+export GAGGLE_HTTP_RETRY_ATTEMPTS=5         ## Retry up to 5 times
+export GAGGLE_HTTP_RETRY_DELAY=2            ## 2 second initial delay
+export GAGGLE_HTTP_RETRY_MAX_DELAY=30       ## Cap backoff at 30s
+export GAGGLE_LOG_LEVEL=WARN                ## Production logging
 
-###  Set Kaggle credentials
+### Set Kaggle credentials
 export KAGGLE_USERNAME="your-username"
 export KAGGLE_KEY="your-api-key"
 
-###  Run DuckDB with Gaggle
+### Run DuckDB with Gaggle
 ./build/release/duckdb
 ```
 
-#####  Example 4: Development/Debug Configuration
+##### Example 4: Development/Debug Configuration
 
 ```bash
-###  Development setup with verbose logging
+### Development setup with verbose logging
 export GAGGLE_CACHE_DIR="./dev-cache"
-export GAGGLE_LOG_LEVEL=DEBUG               ###  Detailed debug logs
-export GAGGLE_HTTP_TIMEOUT=10               ###  Shorter timeout for dev
-export GAGGLE_HTTP_RETRY_ATTEMPTS=1         ###  Fail fast in development
-export GAGGLE_HTTP_RETRY_DELAY=0.25         ###  Quick retry (250ms)
+export GAGGLE_LOG_LEVEL=DEBUG               ### Detailed debug logs
+export GAGGLE_HTTP_TIMEOUT=10               ### Shorter timeout for dev
+export GAGGLE_HTTP_RETRY_ATTEMPTS=1         ### Fail fast in development
+export GAGGLE_HTTP_RETRY_DELAY=0.25         ### Quick retry (250ms)
 
-###  Run DuckDB
+### Run DuckDB
 ./build/release/duckdb
 ```
 
-#####  Example 5: Slow Network Configuration
+##### Example 5: Slow Network Configuration
 
 ```bash
-###  Configuration for slow or unreliable networks
-export GAGGLE_HTTP_TIMEOUT=300              ###  5 minute timeout
-export GAGGLE_HTTP_RETRY_ATTEMPTS=10        ###  Many retries
-export GAGGLE_HTTP_RETRY_DELAY=5            ###  5 second initial delay
-export GAGGLE_HTTP_RETRY_MAX_DELAY=60       ###  Cap at 60s
+### Configuration for slow or unreliable networks
+export GAGGLE_HTTP_TIMEOUT=300              ### 5 minute timeout
+export GAGGLE_HTTP_RETRY_ATTEMPTS=10        ### Many retries
+export GAGGLE_HTTP_RETRY_DELAY=5            ### 5 second initial delay
+export GAGGLE_HTTP_RETRY_MAX_DELAY=60       ### Cap at 60s
 
 ./build/release/duckdb
 ```
 
-#####  Example 6: Offline Mode
+##### Example 6: Offline Mode
 
 ```bash
-##  Enable offline mode
+## Enable offline mode
 export GAGGLE_OFFLINE=1
 
-##  Attempt to download a dataset (will fail if not cached)
+## Attempt to download a dataset (will fail if not cached)
 SELECT gaggle_download('username/dataset-name');
 
-##  Querying metadata or searching will fail fast in offline mode
+## Querying metadata or searching will fail fast in offline mode
 SELECT gaggle_info('username/dataset-name');
 SELECT gaggle_search('keyword', 1, 10);
 ```
 
-####  Configuration Verification
+#### Configuration Verification
 
 You can verify your configuration at runtime:
 
@@ -280,16 +280,16 @@ SELECT gaggle_info('username/dataset-name');
 SELECT gaggle_last_error();
 ```
 
-####  Retry Policy Details
+#### Retry Policy Details
 
 Gaggle implements retries with exponential backoff for HTTP requests. The number of attempts, initial delay, and
 maximum delay can be tuned with the environment variables above.
 
-####  Logging Levels
+#### Logging Levels
 
 Detailed logging control via `GAGGLE_LOG_LEVEL` is implemented.
 
-####  Units
+#### Units
 
 - Storage sizes are reported in megabytes (MB) throughout the API and SQL functions.
 - Timeouts and retry delays are configured in seconds via environment variables with clean names (no unit suffixes). For

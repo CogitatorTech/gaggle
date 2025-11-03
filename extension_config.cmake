@@ -83,16 +83,6 @@ if (EXISTS ${GAGGLE_RUST_LIB})
     # Add the Rust library to global link libraries so it gets linked to everything
     if(UNIX)
         link_libraries(${GAGGLE_RUST_LIB} pthread dl m)
-        # Link against liblzma - the xz submodule target will be used if available,
-        # otherwise falls back to system lzma. The target is typically added by the
-        # main CMakeLists.txt before extension targets are built.
-        if(TARGET liblzma)
-            link_libraries(liblzma)
-            message(STATUS "[gaggle] Linking against xz submodule's liblzma target")
-        else()
-            link_libraries(lzma)
-            message(STATUS "[gaggle] Linking against system lzma (xz submodule target not yet available)")
-        endif()
     else()
         link_libraries(${GAGGLE_RUST_LIB})
         if(WIN32)
@@ -119,7 +109,6 @@ if (EXISTS ${GAGGLE_RUST_LIB})
         add_link_options($<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-lpthread>)
         add_link_options($<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-ldl>)
         add_link_options($<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-lm>)
-        # Note: liblzma linking is handled via link_libraries(liblzma) above
     else()
         add_link_options($<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${GAGGLE_RUST_LIB}>)
     endif()

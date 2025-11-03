@@ -75,7 +75,7 @@ impl CacheMetadata {
     }
 }
 
-/// Guard to ensure download lock is released
+/// Guard to guarantee download lock is released
 struct LockGuard {
     key: String,
 }
@@ -180,7 +180,7 @@ fn download_dataset_version(
         sleep(Duration::from_millis(poll_ms.max(1)));
     }
 
-    // Ensure we clean up the lock when done
+    // Make sure we clean up the lock when done
     let _guard = LockGuard {
         key: lock_key.clone(),
     };
@@ -309,7 +309,7 @@ pub fn download_single_file(dataset_path: &str, filename: &str) -> Result<PathBu
         )));
     }
 
-    // Ensure parent directories exist
+    // Make sure the parent directories exist
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -364,7 +364,7 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
     let mut total_size: u64 = 0;
     let mut files_extracted: usize = 0;
 
-    // Ensure destination directory exists and canonicalize it once
+    // Make sure the destination directory exists and canonicalize it once
     fs::create_dir_all(dest_dir)?;
     let canonical_dest = dest_dir.canonicalize().map_err(|e| {
         GaggleError::IoError(format!(
@@ -389,7 +389,7 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
             }
         }
 
-        // Ensure the path is safe (prevents path traversal like ../)
+        // Verify the path is safe (prevents path traversal like ../)
         let rel_path = match entry.enclosed_name() {
             Some(path) => path.to_owned(),
             None => {
@@ -1192,23 +1192,23 @@ mod tests {
 
     #[test]
     fn test_enforce_cache_limit_no_limit() {
-        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "unlimited");
+        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT", "unlimited");
         let result = enforce_cache_limit_now();
         assert!(result.is_ok());
-        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
     }
 
     #[test]
     fn test_enforce_cache_limit_within_limit() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
-        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "1000");
+        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT", "1000");
 
         let result = enforce_cache_limit_now();
         assert!(result.is_ok());
 
         std::env::remove_var("GAGGLE_CACHE_DIR");
-        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
     }
 
     #[test]
@@ -1327,14 +1327,14 @@ mod tests {
         fs::write(d2.join("b.bin"), vec![0u8; 2 * 1024 * 1024]).unwrap(); // 2MB
 
         // Total ~4MB; set limit to 2MB so eviction must occur
-        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "2");
+        std::env::set_var("GAGGLE_CACHE_SIZE_LIMIT", "2");
         enforce_cache_limit_now().unwrap();
 
-        // After eviction, total size must be <= 2MB
+        // After eviction, the total size must be <= 2MB
         let total = get_total_cache_size_mb().unwrap();
         assert!(total <= 2);
 
-        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        std::env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
         std::env::remove_var("GAGGLE_CACHE_DIR");
     }
 }

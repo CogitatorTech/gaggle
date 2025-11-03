@@ -178,7 +178,7 @@ fn test_single_file_fetch_on_demand() {
     };
     assert!(path.exists());
 
-    // Ensure that full dataset extraction marker is not required for single-file presence
+    // Make sure that full dataset extraction marker is not required for single-file presence
     let ds_dir = temp.path().join("datasets/owner/dataset");
     assert!(ds_dir.join("data.csv").exists());
     // .downloaded marker may not exist yet (partial cache is allowed)

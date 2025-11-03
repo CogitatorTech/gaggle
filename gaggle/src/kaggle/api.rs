@@ -50,7 +50,7 @@ pub(crate) fn get_api_base() -> String {
             return b.trim_end_matches('/').to_string();
         }
     }
-    // Ensure no trailing slash to avoid double slashes when joining paths
+    // Make sure no trailing slash to avoid double slashes when joining paths
     env::var("GAGGLE_API_BASE")
         .unwrap_or_else(|_| "https://www.kaggle.com/api/v1".to_string())
         .trim_end_matches('/')

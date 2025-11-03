@@ -163,7 +163,7 @@ pub fn http_retry_max_delay_ms() -> u64 {
 /// Cache size limit in megabytes (default 100GB = 102400 MB)
 /// Returns None if unlimited
 pub fn cache_size_limit_mb() -> Option<u64> {
-    match env::var("GAGGLE_CACHE_SIZE_LIMIT_MB").ok() {
+    match env::var("GAGGLE_CACHE_SIZE_LIMIT").ok() {
         Some(val) if val.to_lowercase() == "unlimited" => None,
         Some(val) => val.parse().ok(),
         None => Some(102400), // Default 100GB
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_cache_size_limit_default() {
-        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
         let limit = cache_size_limit_mb();
         assert_eq!(limit, Some(102400)); // 100GB default
     }
@@ -488,19 +488,19 @@ mod tests {
     #[test]
     #[serial]
     fn test_cache_size_limit_custom() {
-        env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "50000");
+        env::set_var("GAGGLE_CACHE_SIZE_LIMIT", "50000");
         let limit = cache_size_limit_mb();
         assert_eq!(limit, Some(50000));
-        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
     }
 
     #[test]
     #[serial]
     fn test_cache_size_limit_unlimited() {
-        env::set_var("GAGGLE_CACHE_SIZE_LIMIT_MB", "unlimited");
+        env::set_var("GAGGLE_CACHE_SIZE_LIMIT", "unlimited");
         let limit = cache_size_limit_mb();
         assert_eq!(limit, None);
-        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT_MB");
+        env::remove_var("GAGGLE_CACHE_SIZE_LIMIT");
     }
 
     #[test]
