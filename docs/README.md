@@ -20,7 +20,7 @@ The table below includes the information about all SQL functions exposed by Gagg
 
 > [!NOTE]
 > The `gaggle_file_path` function will fetch the file into the cache if it is missing; set `GAGGLE_STRICT_ONDEMAND=1` to prevent fallback to a full dataset download on failures.
-> 
+>
 > Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
 > Kaggle.
 > For example: `habedi/flickr-8k-dataset-clean`.
