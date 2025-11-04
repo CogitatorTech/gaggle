@@ -30,7 +30,7 @@ updates, etc.
 This workflow can quickly become complex, especially when working with multiple datasets or when datasets are updated
 frequently.
 Gaggle tries to help simplify this process by hiding the complexity and letting you work with datasets directly inside
-DuckDB that allow you to run fast analytical queries on the data.
+DuckDB that allows you to run fast analytical queries on the data.
 
 In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 
@@ -102,8 +102,7 @@ select gaggle_version();
 select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
--- Read a Parquet file from local cache using a prepared statement
--- (DuckDB doesn't allow the use of subqueries in function arguments, so we use a prepared statement)
+-- Read a Parquet file from the local cache using a prepared statement
 prepare rp as select * from read_parquet(?) limit 10;
 execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
@@ -114,7 +113,7 @@ from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
 -- Optionally, we check cache info
 select gaggle_cache_info();
 
--- Check if cached dataset is current (is newest version?)
+-- Check if cached dataset is current (is the newest version?)
 select gaggle_is_current('habedi/flickr-8k-dataset-clean');
 ```
 
