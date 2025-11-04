@@ -39,9 +39,9 @@ In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 - Provides a simple API to interact with Kaggle datasets from DuckDB
 - Allows you to search, download, and read datasets from Kaggle
 - Supports datasets that contain CSV, Parquet, JSON, and XLSX files
+- Supports dataset updates and versioning
 - Configurable and has built-in caching support to avoid re-downloading
 - Thread-safe, fast, and has a low memory footprint
-- Supports dataset updates and versioning
 
 See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
