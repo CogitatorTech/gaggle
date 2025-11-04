@@ -103,7 +103,7 @@ select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
 -- Read a Parquet file from local cache using a prepared statement
--- (DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
+-- (DuckDB doesn't allow the use of subqueries in function arguments, so we use a prepared statement)
 prepare rp as select * from read_parquet(?) limit 10;
 execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
