@@ -5,23 +5,32 @@ use std::fs;
 use crate::error;
 use crate::kaggle;
 
-/// Initialize logging for the Rust core based on GAGGLE_LOG_LEVEL
+/// Initializes logging for the Gaggle Rust core.
+///
+/// This function sets up the logging framework based on the `GAGGLE_LOG_LEVEL`
+/// environment variable. It should be called once at the beginning of the
+/// application's lifecycle.
 #[no_mangle]
 pub extern "C" fn gaggle_init_logging() {
     crate::init_logging();
 }
 
-/// Set Kaggle API credentials
+/// Sets the Kaggle API credentials.
 ///
-/// Arguments:
-/// - `username`: non-null pointer to a NUL-terminated C string
-/// - `key`: non-null pointer to a NUL-terminated C string
+/// # Arguments
 ///
-/// Returns 0 on success, -1 on failure (call gaggle_last_error).
+/// * `username` - A non-null pointer to a NUL-terminated C string representing the Kaggle username.
+/// * `key` - A non-null pointer to a NUL-terminated C string representing the Kaggle API key.
+///
+/// # Returns
+///
+/// Returns `0` on success, or `-1` on failure. If the operation fails,
+/// a detailed error message can be retrieved using `gaggle_last_error`.
 ///
 /// # Safety
-/// - The pointers must be valid and remain alive for the duration of this call.
-/// - Strings must be valid UTF-8; interior NULs are not allowed.
+///
+/// - The pointers must be valid and remain accessible for the duration of this call.
+/// - The provided strings must be valid UTF-8, and interior NUL characters are not permitted.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_set_credentials(
     username: *const c_char,
@@ -58,15 +67,23 @@ pub unsafe extern "C" fn gaggle_set_credentials(
     }
 }
 
-/// Download a Kaggle dataset and return its local cache path
+/// Downloads a Kaggle dataset and returns its local cache path.
 ///
-/// Arguments:
-/// - `dataset_path`: non-null pointer to a NUL-terminated C string "owner/dataset[[@vN|@latest]]".
+/// # Arguments
 ///
-/// Returns pointer to a heap-allocated C string. Free with gaggle_free(). On error, returns NULL and sets gaggle_last_error.
+/// * `dataset_path` - A non-null pointer to a NUL-terminated C string in the format
+///   "owner/dataset[[@vN|@latest]]".
+///
+/// # Returns
+///
+/// Returns a pointer to a heap-allocated C string containing the local path.
+/// This string must be freed with `gaggle_free()`. On error, returns `NULL`
+/// and sets a detailed error message retrievable with `gaggle_last_error`.
 ///
 /// # Safety
-/// - The pointer must be valid and the string valid UTF-8; interior NULs are not allowed.
+///
+/// - The pointer must be valid and the string must be valid UTF-8.
+/// - Interior NUL characters are not allowed in the string.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -96,16 +113,17 @@ pub unsafe extern "C" fn gaggle_download_dataset(dataset_path: *const c_char) ->
     }
 }
 
-/// Get the local path to a specific file in a downloaded dataset
+/// Retrieves the local path to a specific file within a downloaded dataset.
 ///
-/// Arguments:
-/// - `dataset_path`: non-null pointer to owner/dataset
-/// - `filename`: non-null pointer to relative filename within the dataset
+/// # Arguments
+///
+/// * `dataset_path` - A non-null pointer to a NUL-terminated C string representing the owner and dataset.
+/// * `filename` - A non-null pointer to a NUL-terminated C string for the relative filename inside the dataset.
 ///
 /// # Safety
 ///
-/// Both pointers must be valid and point to valid NUL-terminated C strings.
-/// Strings must be valid UTF-8; interior NULs are not allowed.
+/// - Both pointers must be valid and point to valid NUL-terminated C strings.
+/// - The strings must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_get_file_path(
     dataset_path: *const c_char,
@@ -139,12 +157,12 @@ pub unsafe extern "C" fn gaggle_get_file_path(
     }
 }
 
-/// List files in a Kaggle dataset
+/// Lists the files available in a Kaggle dataset.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -175,12 +193,12 @@ pub unsafe extern "C" fn gaggle_list_files(dataset_path: *const c_char) -> *mut 
     }
 }
 
-/// Search for Kaggle datasets
+/// Searches for Kaggle datasets.
 ///
 /// # Safety
 ///
-/// The query pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The `query` pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_search(
     query: *const c_char,
@@ -215,12 +233,12 @@ pub unsafe extern "C" fn gaggle_search(
     }
 }
 
-/// Get metadata for a specific Kaggle dataset
+/// Retrieves metadata for a specific Kaggle dataset.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -251,20 +269,20 @@ pub unsafe extern "C" fn gaggle_get_dataset_info(dataset_path: *const c_char) ->
     }
 }
 
-/// Get version information
+/// Retrieves the version of the Gaggle library.
 #[no_mangle]
 pub extern "C" fn gaggle_get_version() -> *mut c_char {
     // Return only the version string (no JSON wrapper)
     string_to_c_string(env!("CARGO_PKG_VERSION").to_string())
 }
 
-/// Frees a heap-allocated C string
+/// Frees a heap-allocated C string.
 ///
 /// # Safety
 ///
-/// `ptr` must be a pointer previously returned by a Gaggle FFI function that transfers ownership
-/// (e.g., gaggle_get_version, gaggle_list_files, etc.).
-/// Passing the same pointer twice, or a pointer not allocated by Gaggle, results in undefined behavior.
+/// `ptr` must be a pointer previously returned by a Gaggle FFI function that transfers ownership,
+/// such as `gaggle_get_version` or `gaggle_list_files`. Passing the same pointer more than once,
+/// or providing a pointer not allocated by Gaggle, will result in undefined behavior.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_free(ptr: *mut c_char) {
     if !ptr.is_null() {
@@ -272,7 +290,7 @@ pub unsafe extern "C" fn gaggle_free(ptr: *mut c_char) {
     }
 }
 
-/// Clear the dataset cache
+/// Clears the dataset cache.
 #[no_mangle]
 pub extern "C" fn gaggle_clear_cache() -> i32 {
     let result = (|| -> Result<(), error::GaggleError> {
@@ -296,7 +314,7 @@ pub extern "C" fn gaggle_clear_cache() -> i32 {
     }
 }
 
-/// Enforce cache size limit by evicting oldest datasets
+/// Enforces the cache size limit by evicting the oldest datasets.
 #[no_mangle]
 pub extern "C" fn gaggle_enforce_cache_limit() -> i32 {
     let result = kaggle::download::enforce_cache_limit_now();
@@ -310,12 +328,12 @@ pub extern "C" fn gaggle_enforce_cache_limit() -> i32 {
     }
 }
 
-/// Check if cached dataset is the current version
+/// Checks if the cached dataset is the current version.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) -> i32 {
     error::clear_last_error_internal();
@@ -343,12 +361,12 @@ pub unsafe extern "C" fn gaggle_is_dataset_current(dataset_path: *const c_char) 
     }
 }
 
-/// Force update dataset to latest version (ignores cache)
+/// Forces an update of the dataset to the latest version, ignoring the cache.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *mut c_char {
     error::clear_last_error_internal();
@@ -377,12 +395,12 @@ pub unsafe extern "C" fn gaggle_update_dataset(dataset_path: *const c_char) -> *
     }
 }
 
-/// Get version information for a dataset
+/// Retrieves version information for a dataset.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char) -> *mut c_char {
     error::clear_last_error_internal();
@@ -411,7 +429,7 @@ pub unsafe extern "C" fn gaggle_dataset_version_info(dataset_path: *const c_char
     }
 }
 
-/// Get cache information
+/// Retrieves information about the cache.
 #[no_mangle]
 pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
     let cache_dir = crate::config::cache_dir_runtime();
@@ -453,12 +471,12 @@ pub extern "C" fn gaggle_get_cache_info() -> *mut c_char {
     string_to_c_string(info.to_string())
 }
 
-/// Parse JSON and expand objects/arrays similar to json_each
+/// Parses JSON and expands objects/arrays, similar to `json_each`.
 ///
 /// # Safety
 ///
-/// The pointer must be valid and point to a valid NUL-terminated C string.
-/// The string must be valid UTF-8; interior NULs are not allowed.
+/// - The pointer must be valid and point to a valid NUL-terminated C string.
+/// - The string must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_char {
     // Clear any previous error
@@ -496,12 +514,12 @@ pub unsafe extern "C" fn gaggle_json_each(json_str: *const c_char) -> *mut c_cha
     }
 }
 
-/// Prefetch multiple files in a dataset without downloading the entire archive
+/// Prefetches multiple files in a dataset without downloading the entire archive.
 ///
 /// # Safety
 ///
-/// Both pointers must be valid and point to valid NUL-terminated C strings.
-/// Strings must be valid UTF-8; interior NULs are not allowed.
+/// - Both pointers must be valid and point to valid NUL-terminated C strings.
+/// - The strings must be valid UTF-8, and interior NUL characters are not allowed.
 #[no_mangle]
 pub unsafe extern "C" fn gaggle_prefetch_files(
     dataset_path: *const c_char,

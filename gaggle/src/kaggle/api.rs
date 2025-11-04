@@ -1,3 +1,10 @@
+// api.rs
+//
+// This module provides the core functionality for interacting with the Kaggle API.
+// It includes functions for building the HTTP client, handling API rate limiting,
+// and implementing a retry mechanism for failed requests. The module is designed
+// to be used by other parts of the Gaggle library that need to make API calls.
+
 use crate::error::GaggleError;
 use reqwest::blocking::Client;
 
@@ -10,7 +17,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
 
-/// Optional global rate limiter: enforce a minimum interval between API calls
+/// An optional global rate limiter that enforces a minimum interval between API calls.
 static LAST_API_CALL: Lazy<Mutex<Instant>> =
     Lazy::new(|| Mutex::new(Instant::now() - Duration::from_secs(3600)));
 
@@ -37,7 +44,9 @@ fn rate_limit_wait() {
     *guard = Instant::now();
 }
 
-/// Helper: get API base URL (overridable at runtime via env for testing)
+/// A helper function that retrieves the API base URL.
+///
+/// This function is overridable at runtime via an environment variable for testing purposes.
 pub(crate) fn get_api_base() -> String {
     #[cfg(test)]
     {
@@ -57,7 +66,7 @@ pub(crate) fn get_api_base() -> String {
         .to_string()
 }
 
-/// Helper: build a reqwest client with timeout and UA
+/// A helper function that builds a `reqwest` client with a timeout and a User-Agent header.
 pub(crate) fn build_client() -> Result<Client, GaggleError> {
     let timeout = Duration::from_secs(crate::config::http_timeout_runtime_secs());
     let ua = format!(
@@ -71,6 +80,10 @@ pub(crate) fn build_client() -> Result<Client, GaggleError> {
         .build()?)
 }
 
+/// A function that executes a given function with a retry mechanism.
+///
+/// This function will attempt to execute the given function up to a configured number of times,
+/// with an exponential backoff between attempts.
 pub(crate) fn with_retries<F, T>(mut f: F) -> Result<T, GaggleError>
 where
     F: FnMut() -> Result<T, GaggleError>,

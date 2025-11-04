@@ -1,3 +1,11 @@
+// property_parse_dataset_path.rs
+//
+// This file contains property-based tests for the `parse_dataset_path` function in the Gaggle
+// library. Using the `proptest` framework, these tests generate a wide range of string inputs
+// to verify that the parser correctly handles valid dataset path formats and rejects invalid
+// ones. The primary goal of these tests is to guarantee the robustness and correctness of the
+// dataset path parsing logic, which is a critical component for interacting with the Kaggle API.
+
 use proptest::prelude::*;
 
 proptest! {

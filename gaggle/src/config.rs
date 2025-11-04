@@ -9,28 +9,31 @@ const DEFAULT_CACHE_DIR_NAME: &str = "gaggle";
 
 pub static CONFIG: Lazy<GaggleConfig> = Lazy::new(GaggleConfig::from_env);
 
-/// Configuration options for Gaggle
+/// `GaggleConfig` contains the configuration options for Gaggle.
+///
+/// These settings are loaded from environment variables and provide
+/// control over caching, logging, and HTTP behavior.
 #[derive(Debug, Clone)]
 pub struct GaggleConfig {
-    /// Directory for caching downloaded datasets
+    /// `cache_dir` specifies the directory for caching downloaded datasets.
+    /// Defaults to a subdirectory within the system's cache directory.
     pub cache_dir: PathBuf,
-    /// Enable verbose logging
+    /// `verbose_logging` enables or disables verbose logging.
     #[allow(dead_code)]
     pub verbose_logging: bool,
-    /// HTTP timeout in seconds
+    /// `http_timeout_secs` sets the HTTP timeout in seconds.
     #[allow(dead_code)]
     pub http_timeout_secs: u64,
-    /// Download lock wait timeout in milliseconds
+    /// `download_wait_timeout_ms` sets the timeout for waiting on a download lock.
     #[allow(dead_code)]
     pub download_wait_timeout_ms: u64,
-    /// Download lock poll interval in milliseconds
+    /// `download_wait_poll_ms` sets the polling interval for the download lock.
     #[allow(dead_code)]
     pub download_wait_poll_ms: u64,
-    // Future: other options
 }
 
 impl GaggleConfig {
-    /// Load configuration from environment variables
+    /// Loads the Gaggle configuration from environment variables.
     pub fn from_env() -> Self {
         Self {
             cache_dir: Self::get_cache_dir(),
@@ -41,7 +44,8 @@ impl GaggleConfig {
         }
     }
 
-    /// Get cache directory from GAGGLE_CACHE_DIR or default
+    /// Retrieves the cache directory from the `GAGGLE_CACHE_DIR` environment
+    /// variable, falling back to a default directory if not set.
     fn get_cache_dir() -> PathBuf {
         env::var("GAGGLE_CACHE_DIR")
             .ok()
@@ -54,7 +58,8 @@ impl GaggleConfig {
             })
     }
 
-    /// Get verbose logging setting from GAGGLE_VERBOSE or default (false)
+    /// Retrieves the verbose logging setting from the `GAGGLE_VERBOSE`
+    /// environment variable, defaulting to `false`.
     fn get_verbose() -> bool {
         if let Ok(val) = env::var("GAGGLE_VERBOSE") {
             match val.to_lowercase().as_str() {
@@ -67,7 +72,8 @@ impl GaggleConfig {
         }
     }
 
-    /// Get HTTP timeout from GAGGLE_HTTP_TIMEOUT or default (30 seconds)
+    /// Retrieves the HTTP timeout from `GAGGLE_HTTP_TIMEOUT`, in seconds.
+    /// Defaults to 30 seconds.
     fn get_http_timeout() -> u64 {
         env::var("GAGGLE_HTTP_TIMEOUT")
             .ok()
@@ -75,7 +81,8 @@ impl GaggleConfig {
             .unwrap_or(30)
     }
 
-    /// Get download wait timeout from env (default 30_000 ms)
+    /// Retrieves the download wait timeout from `GAGGLE_DOWNLOAD_WAIT_TIMEOUT`,
+    /// in milliseconds. Defaults to 30,000 ms.
     fn get_download_wait_timeout_ms() -> u64 {
         env::var("GAGGLE_DOWNLOAD_WAIT_TIMEOUT")
             .ok()
@@ -84,7 +91,8 @@ impl GaggleConfig {
             .unwrap_or(30_000)
     }
 
-    /// Get download wait poll interval from env (default 100 ms)
+    /// Retrieves the download wait poll interval from `GAGGLE_DOWNLOAD_WAIT_POLL`,
+    /// in milliseconds. Defaults to 100 ms.
     fn get_download_wait_poll_ms() -> u64 {
         env::var("GAGGLE_DOWNLOAD_WAIT_POLL")
             .ok()

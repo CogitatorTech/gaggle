@@ -1,3 +1,11 @@
+// credentials.rs
+//
+// This module manages Kaggle API credentials for the Gaggle library. It provides
+// functions for setting and retrieving credentials, with support for loading them
+// from environment variables or a `kaggle.json` file. The credentials are stored
+// in a thread-safe, lazily-initialized global variable to check that they are
+// loaded only once and can be safely accessed from multiple threads.
+
 use crate::error::GaggleError;
 use parking_lot::RwLock;
 use std::fs;
@@ -5,9 +13,12 @@ use std::fs;
 static CREDENTIALS: once_cell::sync::Lazy<RwLock<Option<KaggleCredentials>>> =
     once_cell::sync::Lazy::new(|| RwLock::new(None));
 
+/// A struct that represents Kaggle API credentials.
 #[derive(Clone)]
 pub struct KaggleCredentials {
+    /// The Kaggle username.
     pub username: String,
+    /// The Kaggle API key.
     pub key: String,
 }
 
@@ -20,7 +31,7 @@ impl std::fmt::Debug for KaggleCredentials {
     }
 }
 
-/// Set Kaggle API credentials
+/// Sets the Kaggle API credentials.
 pub fn set_credentials(username: &str, key: &str) -> Result<(), GaggleError> {
     let mut creds = CREDENTIALS.write();
     *creds = Some(KaggleCredentials {
@@ -30,7 +41,7 @@ pub fn set_credentials(username: &str, key: &str) -> Result<(), GaggleError> {
     Ok(())
 }
 
-/// Get stored credentials or try to load from environment/file
+/// Retrieves the stored credentials, or attempts to load them from the environment or a file.
 pub fn get_credentials() -> Result<KaggleCredentials, GaggleError> {
     // Check if credentials are already set in memory (fast path with read lock)
     if let Some(creds) = CREDENTIALS.read().as_ref() {

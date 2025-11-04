@@ -1,4 +1,11 @@
-// filepath: /home/hassan/Workspace/RustRoverProjects/gaggle/gaggle/tests/replacement_scan_excel.rs
+// replacement_scan_excel.rs
+//
+// This integration test is designed to verify the replacement scan functionality of the
+// Gaggle DuckDB extension specifically for Excel (.xlsx) files. The test checks if the
+// extension correctly identifies and processes queries for tables with the "kaggle:" prefix
+// that point to Excel files. It sets up a mock cached dataset containing a placeholder .xlsx
+// file and then attempts to query it using DuckDB.
+
 use std::path::PathBuf;
 use std::process::Command;
 

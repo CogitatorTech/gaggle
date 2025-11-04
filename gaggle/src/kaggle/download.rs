@@ -1,3 +1,11 @@
+// download.rs
+//
+// This module provides the core functionality for downloading and managing Kaggle datasets.
+// It includes functions for downloading entire datasets or single files, as well as for
+// managing the local cache, including eviction of old datasets to enforce a size limit.
+// The module also provides functions for listing files in a dataset and for checking if a
+// cached dataset is the most recent version.
+
 use crate::error::GaggleError;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -16,9 +24,12 @@ use tracing::{debug, warn};
 static DOWNLOAD_LOCKS: once_cell::sync::Lazy<Mutex<HashMap<String, ()>>> =
     once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// A struct that represents a file within a Kaggle dataset.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatasetFile {
+    /// The name of the file.
     pub name: String,
+    /// The size of the file in bytes.
     pub size: u64,
 }
 
@@ -44,12 +55,16 @@ fn list_dataset_files_from_metadata(dataset_path: &str) -> Result<Vec<DatasetFil
     Ok(out)
 }
 
-/// Metadata stored in .downloaded marker file
+/// A struct that represents the metadata stored in the `.downloaded` marker file.
 #[derive(Debug, Serialize, Deserialize)]
 struct CacheMetadata {
+    /// The time the dataset was downloaded, in seconds since the Unix epoch.
     downloaded_at_secs: u64,
+    /// The path to the dataset.
     dataset_path: String,
+    /// The size of the dataset in megabytes.
     size_mb: u64,
+    /// The version of the dataset.
     version: Option<String>,
 }
 
@@ -86,11 +101,13 @@ impl Drop for LockGuard {
     }
 }
 
-/// Download a Kaggle dataset (supports version pinning)
-/// Examples:
-///   "owner/dataset" - downloads latest version
-///   "owner/dataset@v2" - downloads version 2
-///   "owner/dataset@latest" - explicitly downloads latest
+/// Downloads a Kaggle dataset, with support for version pinning.
+///
+/// # Examples
+///
+/// * `"owner/dataset"` - Downloads the latest version.
+/// * `"owner/dataset@v2"` - Downloads version 2.
+/// * `"owner/dataset@latest"` - Explicitly downloads the latest version.
 pub fn download_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     // Parse path to extract optional version
     let (owner, dataset, version) = super::parse_dataset_path_with_version(dataset_path)?;
@@ -271,7 +288,7 @@ fn download_dataset_version(
     Ok(cache_dir)
 }
 
-/// Download a single file within a Kaggle dataset into the cache without extracting the entire archive
+/// Downloads a single file from a Kaggle dataset into the cache, without extracting the entire archive.
 pub fn download_single_file(dataset_path: &str, filename: &str) -> Result<PathBuf, GaggleError> {
     // Validate dataset path and filename to prevent traversal
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
@@ -352,7 +369,7 @@ pub fn download_single_file(dataset_path: &str, filename: &str) -> Result<PathBu
     Ok(target_path)
 }
 
-/// Extract ZIP file
+/// Extracts the contents of a ZIP file.
 pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, GaggleError> {
     let file = fs::File::open(zip_path)?;
     let mut archive =
@@ -462,8 +479,11 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
     Ok(files_extracted)
 }
 
-/// List files in a dataset. If cached locally, list from disk. Otherwise, try remote metadata-based listing first,
-/// and only fall back to downloading if remote listing is unavailable.
+/// Lists the files in a dataset.
+///
+/// If the dataset is cached locally, the function lists the files from the disk. Otherwise, it
+/// attempts to list them from the remote metadata. If the remote metadata is unavailable,
+/// it falls back to downloading the dataset and then listing the files.
 pub fn list_dataset_files(dataset_path: &str) -> Result<Vec<DatasetFile>, GaggleError> {
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
     let dataset_dir = crate::config::cache_dir_runtime()
@@ -541,7 +561,7 @@ pub fn list_dataset_files(dataset_path: &str) -> Result<Vec<DatasetFile>, Gaggle
     Ok(files)
 }
 
-/// Get the local path to a specific file in a dataset
+/// Retrieves the local path to a specific file in a dataset.
 pub fn get_dataset_file_path(dataset_path: &str, filename: &str) -> Result<PathBuf, GaggleError> {
     // Validate filename to prevent path traversal or absolute paths
     use std::path::Component;
@@ -694,7 +714,7 @@ fn get_cached_datasets() -> Result<Vec<(PathBuf, CacheMetadata)>, GaggleError> {
     Ok(datasets)
 }
 
-/// Calculate total cache size in MB
+/// Calculates the total size of the cache in megabytes.
 pub fn get_total_cache_size_mb() -> Result<u64, GaggleError> {
     let datasets = get_cached_datasets()?;
     Ok(datasets.iter().map(|(_, meta)| meta.size_mb).sum())
@@ -741,12 +761,12 @@ fn enforce_cache_limit() -> Result<(), GaggleError> {
     Ok(())
 }
 
-/// Public function to manually enforce cache limit
+/// A public function that manually enforces the cache limit.
 pub fn enforce_cache_limit_now() -> Result<(), GaggleError> {
     enforce_cache_limit()
 }
 
-/// Check if cached dataset is the current version
+/// Checks if the cached dataset is the current version.
 pub fn is_dataset_current(dataset_path: &str) -> Result<bool, GaggleError> {
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
 
@@ -782,7 +802,7 @@ pub fn is_dataset_current(dataset_path: &str) -> Result<bool, GaggleError> {
     Ok(cached_version == current_version)
 }
 
-/// Force update dataset to latest version (ignores cache)
+/// Forces an update of the dataset to the latest version, ignoring the cache.
 pub fn update_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
 
@@ -800,7 +820,7 @@ pub fn update_dataset(dataset_path: &str) -> Result<PathBuf, GaggleError> {
     download_dataset(dataset_path)
 }
 
-/// Get version information for a dataset
+/// Retrieves version information for a dataset.
 pub fn get_dataset_version_info(dataset_path: &str) -> Result<serde_json::Value, GaggleError> {
     let (owner, dataset) = super::parse_dataset_path(dataset_path)?;
 

@@ -1,4 +1,12 @@
-// filepath: /home/hassan/Workspace/RustRoverProjects/gaggle/gaggle/tests/offline_mode.rs
+// offline_mode.rs
+//
+// This integration test verifies the behavior of the Gaggle library when operating in
+// offline mode. The test verifies that dataset downloads fail as expected when the
+// dataset is not already cached and that version information is handled correctly
+// when the library cannot access the network. By setting the `GAGGLE_OFFLINE`
+// environment variable, the test simulates a scenario with no internet connectivity
+// and asserts that the library's FFI functions behave as designed in this context.
+
 use std::ffi::CString;
 
 #[test]

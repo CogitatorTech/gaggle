@@ -1,8 +1,11 @@
 use std::fs;
 use std::path::Path;
 
-/// Recursively calculate the size of a directory in bytes.
-/// Follows the same semantics as previous inline helpers in ffi.rs and download.rs.
+/// Recursively calculates the size of a directory in bytes.
+///
+/// This function traverses the directory tree from the given path and sums the
+/// sizes of all files. It follows the same semantics as the previous inline
+/// helpers in `ffi.rs` and `download.rs`.
 pub fn calculate_dir_size(path: &Path) -> Result<u64, std::io::Error> {
     let mut total = 0u64;
     if path.is_dir() {
@@ -19,7 +22,9 @@ pub fn calculate_dir_size(path: &Path) -> Result<u64, std::io::Error> {
     Ok(total)
 }
 
-/// Choose DuckDB reader function name based on file extension (lowercased).
+/// Selects the appropriate DuckDB reader function based on the file extension.
+///
+/// The selection is case-insensitive.
 #[allow(dead_code)]
 pub fn guess_reader_for_path(path: &str) -> &'static str {
     let lower = path.to_ascii_lowercase();

@@ -1,3 +1,12 @@
+// test_security.rs
+//
+// This file contains security-focused tests for the Gaggle library. The tests are designed to
+// verify that the library is robust against various types of malicious inputs and that it
+// correctly handles concurrent access to shared resources. The tests cover a range of potential
+// vulnerabilities, including path traversal, null byte injection, and the handling of special
+// characters in dataset paths. Additionally, the tests verify the thread safety of the library
+// by simulating concurrent access to credential settings and cache information.
+
 use gaggle::parse_dataset_path;
 
 #[test]

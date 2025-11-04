@@ -1,3 +1,11 @@
+// integration_mock.rs
+//
+// This integration test verifies the search and info functionalities of the Gaggle library
+// using a mock HTTP server. It guarantees that the library correctly interacts with the Kaggle API
+// endpoints for searching datasets and retrieving dataset information. The test sets up a mock
+// server to simulate the Kaggle API, calls the relevant Gaggle FFI functions, and asserts
+// that the functions return the expected results without errors.
+
 use gaggle::{
     gaggle_free, gaggle_get_cache_info, gaggle_get_dataset_info, gaggle_search,
     gaggle_set_credentials,

@@ -21,8 +21,11 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 static LOG_INIT: OnceCell<()> = OnceCell::new();
 
-/// Initialize global logging based on GAGGLE_LOG_LEVEL.
-/// Safe to call multiple times; only the first call has an effect.
+/// Initializes global logging for Gaggle, governed by the `GAGGLE_LOG_LEVEL`
+/// environment variable.
+///
+/// This function can be safely called multiple times; however, only the first
+/// invocation will have an effect.
 pub fn init_logging() {
     let _ = LOG_INIT.get_or_init(|| {
         let level = std::env::var("GAGGLE_LOG_LEVEL").unwrap_or_else(|_| "WARN".to_string());

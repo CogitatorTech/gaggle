@@ -1,3 +1,10 @@
+// mock_http.rs
+//
+// This file contains integration tests for the Gaggle library that use a mock HTTP server
+// to simulate interactions with the Kaggle API. These tests are designed to verify the
+// behavior of Gaggle's core functionalities, such as searching, downloading, and managing
+// datasets, in a controlled environment.
+
 use mockito::{Matcher, Server};
 use std::env;
 use std::ffi::{CStr, CString};

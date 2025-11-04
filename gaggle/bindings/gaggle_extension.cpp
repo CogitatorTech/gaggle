@@ -1,3 +1,11 @@
+/**
+ * @file gaggle_extension.cpp
+ * @brief This file contains the implementation of the Gaggle DuckDB extension.
+ *
+ * It includes the definitions for the scalar and table functions that provide
+ * Gaggle's functionality within DuckDB, as well as the extension loading and
+ * registration logic.
+ */
 #define DUCKDB_EXTENSION_MAIN
 
 #include "include/gaggle_extension.hpp"

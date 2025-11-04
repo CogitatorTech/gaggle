@@ -1,5 +1,10 @@
-// Regression tests for bugs fixed in Gaggle
-// These tests make sure previously fixed bugs don't reoccur
+// test_regression.rs
+//
+// This file contains regression tests for the Gaggle library. The purpose of these tests is to
+// guarantee that bugs that have been fixed in the past do not reoccur in future versions of the
+// library. Each test in this suite is designed to replicate the conditions that caused a
+// specific bug, and then verify that the bug is no longer present. This is a critical part
+// of maintaining the long-term stability and reliability of the Gaggle library.
 
 use gaggle::{gaggle_clear_last_error, gaggle_last_error};
 use gaggle::{gaggle_download_dataset, gaggle_free, gaggle_set_credentials};

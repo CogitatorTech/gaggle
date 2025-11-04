@@ -1,3 +1,11 @@
+// mod.rs
+//
+// This module serves as the main entry point for the Kaggle functionality in the Gaggle
+// library. It re-exports the public functions from the other modules in this directory,
+// providing a single, consistent interface for interacting with the Kaggle API. It also
+// contains the core logic for parsing dataset paths, which is a critical component for
+// all of the other functionality in this library.
+
 pub mod api;
 pub mod credentials;
 pub mod download;
