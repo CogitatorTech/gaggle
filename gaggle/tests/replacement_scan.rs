@@ -1,3 +1,12 @@
+// replacement_scan.rs
+//
+// This integration test verifies the replacement scan functionality of the Gaggle DuckDB
+// extension. The test guarantees that the extension can correctly intercept queries for tables
+// with the "kaggle:" prefix, resolve the dataset path to a local cache, and read data from
+// CSV and JSON files using DuckDB's readers. The test sets up a mock cached dataset, runs
+// DuckDB with a SQL script that queries the dataset, and validates the results to confirm
+// that the replacement scan is working as expected.
+
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;

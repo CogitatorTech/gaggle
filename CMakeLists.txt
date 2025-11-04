@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
+
 set(CORROSION_VERBOSE_OUTPUT ON)
 
 # We need C++17 for std::filesystem on all platforms
@@ -143,6 +144,10 @@ message(STATUS "OS_ARCH: ${OS_ARCH} (orig='${_GAGGLE_ORIG_OS_ARCH}')")
 message(STATUS "DUCKDB_PLATFORM: ${DUCKDB_PLATFORM}")
 message(STATUS "Rust_CARGO_TARGET: ${Rust_CARGO_TARGET}")
 
+
+# ==============================================================================
+# Corrosion (Rust integration)
+# ==============================================================================
 include(FetchContent)
 FetchContent_Declare(
     Corrosion

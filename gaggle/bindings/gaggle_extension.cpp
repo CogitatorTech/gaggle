@@ -1,3 +1,11 @@
+/**
+ * @file gaggle_extension.cpp
+ * @brief This file contains the implementation of the Gaggle DuckDB extension.
+ *
+ * It includes the definitions for the scalar and table functions that provide
+ * Gaggle's functionality within DuckDB, as well as the extension loading and
+ * registration logic.
+ */
 #define DUCKDB_EXTENSION_MAIN
 
 #include "include/gaggle_extension.hpp"
@@ -544,7 +552,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
   };
 
   if (is_dir || has_wildcard) {
-    // Ensure dataset is downloaded and construct a glob path
+    // Verify that the dataset is downloaded and construct a glob path
     char *dir_c = gaggle_download_dataset(dataset_path.c_str());
     if (!dir_c) {
       throw InvalidInputException("Failed to prepare dataset directory: " +
@@ -609,7 +617,7 @@ static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
   }
   result->dataset_path = input.inputs[0].ToString();
 
-  // Ensure dataset is downloaded and get directory
+  // Verify that the dataset is downloaded and get directory
   char *dir_c = gaggle_download_dataset(result->dataset_path.c_str());
   if (!dir_c) {
     throw InvalidInputException("Failed to download dataset: " +
@@ -740,7 +748,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 // Provide out-of-line definitions for the extension class
 void GaggleExtension::Load(ExtensionLoader &loader) { LoadInternal(loader); }
 std::string GaggleExtension::Name() { return "gaggle"; }
-std::string GaggleExtension::Version() const { return std::string("0.1.0-alpha.2"); }
+std::string GaggleExtension::Version() const { return std::string("0.1.0-alpha.3"); }
 
 } // namespace duckdb
 

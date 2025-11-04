@@ -39,7 +39,7 @@ extern "C" {
 /**
  * Clears the last error for the current thread.
  *
- * This is useful for ensuring that old error messages don't persist
+ * This is useful for making sure that old error messages don't persist
  * and get confused with new errors.
  */
  void gaggle_clear_last_error(void);

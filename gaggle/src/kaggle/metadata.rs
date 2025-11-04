@@ -1,3 +1,11 @@
+// metadata.rs
+//
+// This module provides functionality for retrieving metadata about Kaggle datasets.
+// It includes a struct for representing dataset information, as well as functions
+// for fetching metadata from the Kaggle API and for determining the current version
+// of a dataset. The module also includes a simple in-memory cache with a TTL
+// to reduce the number of API calls for frequently accessed metadata.
+
 use crate::error::GaggleError;
 use serde::{Deserialize, Serialize};
 
@@ -7,13 +15,19 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+/// A struct that represents information about a Kaggle dataset.
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct DatasetInfo {
+    /// The reference path of the dataset, in the format `owner/dataset`.
     pub ref_path: String,
+    /// The title of the dataset.
     pub title: String,
+    /// The size of the dataset in bytes.
     pub size: u64,
+    /// The URL of the dataset.
     pub url: String,
+    /// The date the dataset was last updated.
     pub last_updated: String,
 }
 
@@ -30,7 +44,7 @@ fn metadata_ttl() -> Duration {
     Duration::from_secs(secs)
 }
 
-/// Get metadata for a specific dataset
+/// Retrieves the metadata for a specific dataset.
 pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, GaggleError> {
     if crate::config::offline_mode() {
         return Err(GaggleError::HttpRequestError(
@@ -79,7 +93,7 @@ pub fn get_dataset_metadata(dataset_path: &str) -> Result<serde_json::Value, Gag
     Ok(json)
 }
 
-/// Get current version number of a dataset from Kaggle API
+/// Retrieves the current version number of a dataset from the Kaggle API.
 pub fn get_current_version(dataset_path: &str) -> Result<String, GaggleError> {
     if crate::config::offline_mode() {
         // In offline mode, try to use cached marker file version if available

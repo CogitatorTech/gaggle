@@ -1,3 +1,11 @@
+// test_error_recovery.rs
+//
+// This file contains integration tests focused on the error recovery mechanisms of the Gaggle
+// library. The tests are designed to make sure that the library correctly handles and reports
+// errors across its FFI boundary. This includes verifying that errors are properly set when
+// invalid operations are performed, that they can be cleared using the provided FFI functions,
+// and that subsequent operations can be executed successfully after an error has been cleared.
+
 use gaggle::{gaggle_clear_last_error, gaggle_last_error};
 use gaggle::{gaggle_download_dataset, gaggle_search, gaggle_set_credentials};
 use std::ffi::{CStr, CString};

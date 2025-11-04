@@ -1,3 +1,11 @@
+// search.rs
+//
+// This module provides functionality for searching for datasets on Kaggle. It
+// includes a function for sending a search query to the Kaggle API and for
+// returning the results as a JSON value. The module handles the details of
+// building the API request, including URL encoding the query and handling
+// pagination.
+
 use crate::error::GaggleError;
 
 use super::api::{build_client, get_api_base, with_retries};

@@ -1,3 +1,10 @@
+// mock_http.rs
+//
+// This file contains integration tests for the Gaggle library that use a mock HTTP server
+// to simulate interactions with the Kaggle API. These tests are designed to verify the
+// behavior of Gaggle's core functionalities, such as searching, downloading, and managing
+// datasets, in a controlled environment.
+
 use mockito::{Matcher, Server};
 use std::env;
 use std::ffi::{CStr, CString};
@@ -178,7 +185,7 @@ fn test_single_file_fetch_on_demand() {
     };
     assert!(path.exists());
 
-    // Ensure that full dataset extraction marker is not required for single-file presence
+    // Make sure that full dataset extraction marker is not required for single-file presence
     let ds_dir = temp.path().join("datasets/owner/dataset");
     assert!(ds_dir.join("data.csv").exists());
     // .downloaded marker may not exist yet (partial cache is allowed)

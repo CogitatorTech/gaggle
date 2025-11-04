@@ -3,34 +3,38 @@ use std::ffi::{c_char, CString};
 use std::str::Utf8Error as StdUtf8Error;
 use thiserror::Error;
 
-/// Error codes for programmatic error handling
+/// `ErrorCode` defines a set of specific error types for programmatic handling.
+///
+/// Each error code corresponds to a distinct category of issue that may arise
+/// during the execution of Gaggle operations. These codes provide a stable,
+/// machine-readable way to identify and react to errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum ErrorCode {
-    /// E001: Invalid or missing Kaggle API credentials
+    /// E001: Indicates invalid or missing Kaggle API credentials.
     E001_InvalidCredentials,
-    /// E002: Requested dataset not found on Kaggle
+    /// E002: Represents that the requested dataset could not be found on Kaggle.
     E002_DatasetNotFound,
-    /// E003: HTTP/Network error during API request
+    /// E003: Signifies an HTTP or network error during an API request.
     E003_NetworkError,
-    /// E004: Invalid dataset path format
+    /// E004: Denotes an invalid format for a dataset path.
     E004_InvalidPath,
-    /// E005: File system I/O error
+    /// E005: An error related to file system I/O operations.
     E005_IoError,
-    /// E006: JSON serialization/deserialization error
+    /// E006: A failure in JSON serialization or deserialization.
     E006_JsonError,
-    /// E007: ZIP file extraction or validation error
+    /// E007: An issue with ZIP file extraction or validation.
     E007_ZipError,
-    /// E008: CSV parsing error
+    /// E008: An error encountered while parsing a CSV file.
     E008_CsvError,
-    /// E009: Invalid UTF-8 string in FFI boundary
+    /// E009: An invalid UTF-8 string was found at an FFI boundary.
     E009_Utf8Error,
-    /// E010: Null pointer passed to FFI function
+    /// E010: A null pointer was passed to an FFI function.
     E010_NullPointer,
 }
 
 impl ErrorCode {
-    /// Get the numeric error code as a string
+    /// Returns the numeric error code as a string slice.
     pub fn code(&self) -> &'static str {
         match self {
             ErrorCode::E001_InvalidCredentials => "E001",
@@ -46,7 +50,7 @@ impl ErrorCode {
         }
     }
 
-    /// Get a short description of the error
+    /// Returns a brief, human-readable description of the error.
     pub fn description(&self) -> &'static str {
         match self {
             ErrorCode::E001_InvalidCredentials => "Invalid Kaggle credentials",

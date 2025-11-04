@@ -30,7 +30,7 @@ updates, etc.
 This workflow can quickly become complex, especially when working with multiple datasets or when datasets are updated
 frequently.
 Gaggle tries to help simplify this process by hiding the complexity and letting you work with datasets directly inside
-an analytical database like DuckDB that can handle fast queries.
+DuckDB that allow you to run fast analytical queries on the data.
 
 In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 
@@ -39,9 +39,9 @@ In essence, Gaggle makes DuckDB into a SQL-enabled frontend for Kaggle datasets.
 - Provides a simple API to interact with Kaggle datasets from DuckDB
 - Allows you to search, download, and read datasets from Kaggle
 - Supports datasets that contain CSV, Parquet, JSON, and XLSX files
-- Configurable and has built-in caching of downloaded datasets
-- Thread-safe, fast, and has a low memory footprint
 - Supports dataset updates and versioning
+- Configurable and has built-in caching support to avoid re-downloading
+- Thread-safe, fast, and has a low memory footprint
 
 See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
@@ -103,7 +103,7 @@ select *
 from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
 
 -- Read a Parquet file from local cache using a prepared statement
--- (DuckDB doesn't support subquery in function arguments, so we use a prepared statement)
+-- (DuckDB doesn't allow the use of subqueries in function arguments, so we use a prepared statement)
 prepare rp as select * from read_parquet(?) limit 10;
 execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'));
 
@@ -118,7 +118,7 @@ select gaggle_cache_info();
 select gaggle_is_current('habedi/flickr-8k-dataset-clean');
 ```
 
-[![Simple Demo 1](https://asciinema.org/a/745806.svg)](https://asciinema.org/a/745806)
+[![Simple Demo 1](https://asciinema.org/a/do6g8xv1G5tkRc4e3bExbNYwZ.svg)](https://asciinema.org/a/do6g8xv1G5tkRc4e3bExbNYwZ)
 
 ---
 

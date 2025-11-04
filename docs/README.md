@@ -2,58 +2,49 @@
 
 The table below includes the information about all SQL functions exposed by Gaggle.
 
-| #  | Function                                                        | Return Type      | Description                                                                                                                                     |
-|----|:----------------------------------------------------------------|:-----------------|:------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | `gaggle_set_credentials(username VARCHAR, key VARCHAR)`         | `BOOLEAN`        | Sets Kaggle API credentials from SQL (alternatively use env vars or `~/.kaggle/kaggle.json`). Returns `true` on success.                        |
-| 2  | `gaggle_download(dataset_path VARCHAR)`                         | `VARCHAR`        | Downloads a Kaggle dataset to the local cache directory and returns the local dataset path. This function is idempotent.                        |
-| 3  | `gaggle_search(query VARCHAR, page INTEGER, page_size INTEGER)` | `VARCHAR (JSON)` | Searches Kaggle datasets and returns a JSON array. Constraints: `page >= 1`, `1 <= page_size <= 100`.                                           |
-| 4  | `gaggle_info(dataset_path VARCHAR)`                             | `VARCHAR (JSON)` | Returns metadata for a dataset as JSON (for example: `title`, `url`, `last_updated`).                                                           |
-| 5  | `gaggle_version()`                                              | `VARCHAR`        | Returns the extension version string (for example: `"0.1.0"`).                                                                                  |
-| 6  | `gaggle_clear_cache()`                                          | `BOOLEAN`        | Clears the dataset cache directory. Returns `true` on success.                                                                                  |
-| 7  | `gaggle_cache_info()`                                           | `VARCHAR (JSON)` | Returns cache info JSON with `path`, `size_mb`, `limit_mb`, `usage_percent`, `is_soft_limit`, and `type` fields.                                |
-| 8  | `gaggle_enforce_cache_limit()`                                  | `BOOLEAN`        | Manually enforces cache size limit using LRU eviction. Returns `true` on success. (Automatic with soft limit by default).                       |
-| 9  | `gaggle_is_current(dataset_path VARCHAR)`                       | `BOOLEAN`        | Checks if cached dataset is the latest version from Kaggle. Returns `false` if not cached or outdated.                                          |
-| 10 | `gaggle_update_dataset(dataset_path VARCHAR)`                   | `VARCHAR`        | Forces update to latest version (ignores cache). Returns local path to freshly downloaded dataset.                                              |
-| 11 | `gaggle_version_info(dataset_path VARCHAR)`                     | `VARCHAR (JSON)` | Returns version info: `cached_version`, `latest_version`, `is_current`, `is_cached`.                                                            |
-| 12 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`        | Expands a JSON object into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`. Users normally shouldn't use this function. |
-| 13 | `gaggle_file_path(dataset_path VARCHAR, filename VARCHAR)`      | `VARCHAR`        | Resolves a specific file's local path inside a downloaded dataset.                                                                              |
+| #  | Function                                                        | Return Type                                      | Description                                                                                                                                     |
+|----|:----------------------------------------------------------------|:-------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1  | `gaggle_set_credentials(username VARCHAR, key VARCHAR)`         | `BOOLEAN`                                        | Sets Kaggle API credentials from SQL (alternatively use env vars or `~/.kaggle/kaggle.json`). Returns `true` on success.                        |
+| 2  | `gaggle_download(dataset_path VARCHAR)`                         | `VARCHAR`                                        | Downloads a Kaggle dataset to the local cache directory and returns the local dataset path. This function is idempotent.                        |
+| 3  | `gaggle_search(query VARCHAR, page INTEGER, page_size INTEGER)` | `VARCHAR (JSON)`                                 | Searches Kaggle datasets and returns a JSON array. Constraints: `page >= 1`, `1 <= page_size <= 100`.                                           |
+| 4  | `gaggle_info(dataset_path VARCHAR)`                             | `VARCHAR (JSON)`                                 | Returns metadata for a dataset as JSON (for example: `title`, `url`, `last_updated`).                                                           |
+| 5  | `gaggle_version()`                                              | `VARCHAR`                                        | Returns the extension version string (for example: `"0.1.0"`).                                                                                  |
+| 6  | `gaggle_clear_cache()`                                          | `BOOLEAN`                                        | Clears the dataset cache directory. Returns `true` on success.                                                                                  |
+| 7  | `gaggle_cache_info()`                                           | `VARCHAR (JSON)`                                 | Returns cache info JSON with `path`, `size_mb`, `limit_mb`, `usage_percent`, `is_soft_limit`, and `type` fields.                                |
+| 8  | `gaggle_enforce_cache_limit()`                                  | `BOOLEAN`                                        | Manually enforces cache size limit using LRU eviction. Returns `true` on success. (Automatic with soft limit by default).                       |
+| 9  | `gaggle_is_current(dataset_path VARCHAR)`                       | `BOOLEAN`                                        | Checks if cached dataset is the latest version from Kaggle. Returns `false` if not cached or outdated.                                          |
+| 10 | `gaggle_update_dataset(dataset_path VARCHAR)`                   | `VARCHAR`                                        | Forces update to latest version (ignores cache). Returns local path to freshly downloaded dataset.                                              |
+| 11 | `gaggle_version_info(dataset_path VARCHAR)`                     | `VARCHAR (JSON)`                                 | Returns version info: `cached_version`, `latest_version`, `is_current`, `is_cached`.                                                            |
+| 12 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`                                        | Expands a JSON object into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`. Users normally shouldn't use this function. |
+| 13 | `gaggle_file_path(dataset_path VARCHAR, filename VARCHAR)`      | `VARCHAR`                                        | Resolves a specific file's local path inside a downloaded dataset.                                                                              |
+| 14 | `gaggle_ls(dataset_path VARCHAR)`                               | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursively) in the dataset's local directory; `size` is in MB.                                                                |
 
 > [!NOTE]
-> The `gaggle_file_path` function will fetch the file into the cache if it is missing; set `GAGGLE_STRICT_ONDEMAND=1` to prevent fallback to a full dataset download on failures.
+> * The `gaggle_file_path` function will retrieve and cache the file if it is not already downloaded; set
+    `GAGGLE_STRICT_ONDEMAND=1` to prevent fallback to a full dataset download on failures.
 >
-> Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
-> Kaggle.
-> For example: `habedi/flickr-8k-dataset-clean`.
-> You can also read files directly using the replacement scan with the `kaggle:` scheme.
-> For example: `'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet`.
-
-Table function:
-
-| #  | Function                          | Return Type                                      | Description                                                                      |
-|----|:----------------------------------|:-------------------------------------------------|:---------------------------------------------------------------------------------|
-| 14 | `gaggle_ls(dataset_path VARCHAR)` | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursively) in the dataset's local directory; `size` is in MB. |
-
-Replacement scan (transparent table read):
-
-- Single file: `'kaggle:owner/dataset/file.ext'`
-- Glob: `'kaggle:owner/dataset/*.ext'`
-- Reader is chosen by extension:
-    - `.parquet`/`.parq` -> `read_parquet`
-    - `.json`/`.jsonl`/`.ndjson` -> `read_json_auto`
-    - `.xlsx` -> `read_excel`
-    - for everything else -> `read_csv_auto`
+> * Dataset paths must be in the form `owner/dataset` where `owner` is the username and `dataset` is the dataset name on
+    > Kaggle.
+    > For example: `habedi/flickr-8k-dataset-clean`.
+    > You can also read files directly using the replacement scan with the `kaggle:` scheme.
+    > For example: `'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet`.
 
 ---
 
 ### Usage Examples
 
+To be able to use most of the examples below, you need to have a valid Kaggle username and API key.
+Check out the [Kaggle API documentation](https://www.kaggle.com/docs/api) for more information on how to
+get your username and API key.
+
 #### Dataset Management
 
 ```sql
 -- Load the Gaggle extension
-load 'build/release/extension/gaggle/gaggle.duckdb_extension';
+load
+'build/release/extension/gaggle/gaggle.duckdb_extension';
 
--- Set Kaggle credentials (or read fron environment variables or from `~/.kaggle/kaggle.json` file)
+-- Set Kaggle credentials (or read from environment variables or from `~/.kaggle/kaggle.json` file)
 select gaggle_set_credentials('your-username', 'your-api-key');
 
 -- Check version
@@ -161,8 +152,6 @@ To build Gaggle from source, you need GNU Make, CMake, a modern C++ compiler (li
    git clone --recursive https://github.com/CogitatorTech/gaggle.git
    cd gaggle
    ```
-   > [!NOTE]
-   > The `--recursive` flag ensures required submodules (like DuckDB) are cloned.
 
 2. **Build the extension:**
    ```bash
@@ -197,3 +186,10 @@ Gaggle is made up of two main components:
     - Defines the custom SQL functions (for example: `gaggle_ls`, `gaggle_file_path`, and `gaggle_search`)
     - Integrates with DuckDB’s extension system and replacement scans (`'kaggle:...'`)
     - Marshals values between DuckDB vectors and the Rust FFI
+
+### Additional Resources
+
+- [ERROR_CODES.md](ERROR_CODES.md): information about the error codes returned by Gaggle.
+- [CONFIGURATION.md](CONFIGURATION.md): details about environment variables that can be used to configure Gaggle's
+  behavior.
+- [examples/](examples): example SQL scripts that showcase various Gaggle features.
