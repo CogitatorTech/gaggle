@@ -30,6 +30,7 @@ select gaggle_download('uciml/iris') as download_path;
 
 -- Section 5: list files (JSON)
 select '## list files (json)';
+-- Note: `path` values returned by gaggle_ls are of the form 'owner/dataset/<relative-path>' (not absolute filesystem paths)
 select to_json(
          list(struct_pack(name := name, size := size, path := path))
        ) as files_json
@@ -38,6 +39,10 @@ from gaggle_ls('uciml/iris');
 -- Section 5b: list files (table)
 select '## list files (table)';
 select * from gaggle_ls('uciml/iris') limit 5;
+
+-- Recursive listing example (walk subdirectories)
+select '## recursive listing example';
+select * from gaggle_ls('suganthidevasagayam/social-media-post-of-postpartum-depression', true) limit 10;
 
 -- Section 6: get dataset metadata
 select '## get dataset metadata';

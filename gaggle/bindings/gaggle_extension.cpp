@@ -516,22 +516,34 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
     return nullptr;
   }
 
-  // Parse kaggle:owner/dataset[/pattern]
+  // Parse kaggle:owner/dataset[/pattern...]
   string kaggle_ref = table_name.substr(7); // Remove "kaggle:" prefix
-  auto last_slash = kaggle_ref.find_last_of('/');
-  if (last_slash == string::npos) {
+  // Find first and second slash to extract owner/dataset as canonical dataset
+  auto first_slash = kaggle_ref.find('/');
+  if (first_slash == string::npos) {
     return nullptr;
   }
+  auto second_slash = kaggle_ref.find('/', first_slash + 1);
 
-  string dataset_path = kaggle_ref.substr(0, last_slash);
-  string pattern = kaggle_ref.substr(last_slash + 1);
+  string dataset_path;
+  string pattern;
+  if (second_slash == string::npos) {
+    // No pattern provided; entire ref is owner/dataset
+    dataset_path = kaggle_ref;
+    pattern = string();
+  } else {
+    // Canonical dataset is first two segments owner/dataset
+    dataset_path = kaggle_ref.substr(0, second_slash);
+    pattern = kaggle_ref.substr(second_slash + 1); // may contain additional slashes
+  }
 
   string func_name = "read_csv_auto";
   string local_path;
 
+  // Determine wildcard/dir status
   auto lower_pat = StringUtil::Lower(pattern);
-  bool has_wildcard =
-      pattern.find('*') != string::npos || pattern.find('?') != string::npos;
+  bool has_wildcard = pattern.find('*') != string::npos ||
+                      pattern.find('?') != string::npos;
   bool is_dir = pattern.empty();
 
   auto decide_reader = [](const string &lower_ext) -> string {
@@ -547,7 +559,6 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
     if (StringUtil::EndsWith(lower_ext, ".xlsx")) {
       return "read_excel";
     }
-    // Default CSV/TSV and others to DuckDB's auto CSV reader
     return "read_csv_auto";
   };
 
@@ -565,15 +576,22 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
     string tail = is_dir ? string("/*") : (string("/") + pattern);
     local_path = dir_path + tail;
 
-    // Choose reader based on pattern extension if any
-    func_name = decide_reader(lower_pat);
+    // Choose reader based on pattern extension if any (use last segment)
+    string last_segment = pattern;
+    if (!pattern.empty()) {
+      auto pos = pattern.find_last_of('/');
+      if (pos != string::npos)
+        last_segment = pattern.substr(pos + 1);
+    }
+    func_name = decide_reader(StringUtil::Lower(last_segment));
   } else {
-    // Specific file: resolve exact path
+    // Specific file or nested path without wildcard: try to resolve exact file
+    // Use canonical dataset_path (owner/dataset) when calling Rust APIs
     char *file_path_c =
         gaggle_get_file_path(dataset_path.c_str(), pattern.c_str());
     if (file_path_c == nullptr) {
-      // Fallback: dataset may have nested paths; attempt a glob match under
-      // dataset root
+      // Fallback: dataset may have nested paths; download dataset root and
+      // inspect filesystem to decide whether pattern is a directory
       char *dir_c = gaggle_download_dataset(dataset_path.c_str());
       if (!dir_c) {
         throw InvalidInputException(
@@ -582,16 +600,31 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
       }
       string dir_path(dir_c);
       gaggle_free(dir_c);
-      local_path = dir_path + "/" + pattern;
-      // Keep func_name decision below based on extension
+
+      fs::path candidate = fs::path(dir_path) / fs::path(pattern);
+      std::error_code ec;
+      if (fs::exists(candidate, ec) && fs::is_directory(candidate, ec)) {
+        // If the resolved target is a directory, read all files in it
+        local_path = candidate.string() + string("/*");
+        // Choose reader based on last segment
+        auto last_seg = candidate.filename().string();
+        func_name = decide_reader(StringUtil::Lower(last_seg));
+      } else {
+        // Not a directory: use the candidate path (may be a file or a pattern)
+        local_path = dir_path + string("/") + pattern;
+        // Decide reader based on extension of pattern's last segment
+        auto pos = pattern.find_last_of('/');
+        string last_segment = (pos == string::npos) ? pattern
+                                                    : pattern.substr(pos + 1);
+        func_name = decide_reader(StringUtil::Lower(last_segment));
+      }
     } else {
+      // Exact file found
       local_path = string(file_path_c);
       gaggle_free(file_path_c);
+      // Decide reader based on pattern lowercased
+      func_name = decide_reader(StringUtil::Lower(pattern));
     }
-
-    // Decide reader based on extension
-    auto lower_name = StringUtil::Lower(pattern);
-    func_name = decide_reader(lower_name);
   }
 
   // Construct a table function call: func_name(local_path)
@@ -611,14 +644,45 @@ static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
                                              vector<LogicalType> &return_types,
                                              vector<string> &names) {
   auto result = make_uniq<GaggleLsBindData>();
-  if (input.inputs.size() != 1) {
+
+  // Accept either gaggle_ls(dataset_path) or gaggle_ls(dataset_path, recursive)
+  if (input.inputs.size() < 1 || input.inputs.size() > 2) {
     throw InvalidInputException(
-        "gaggle_ls(dataset_path) expects exactly 1 argument");
+        "gaggle_ls(dataset_path[, recursive]) expects 1 or 2 arguments");
   }
   result->dataset_path = input.inputs[0].ToString();
 
-  // Verify that the dataset is downloaded and get directory
-  char *dir_c = gaggle_download_dataset(result->dataset_path.c_str());
+  bool recursive = false;
+  if (input.inputs.size() == 2) {
+    // Second argument is expected to be a boolean constant at bind time
+    const auto &val = input.inputs[1];
+    if (!val.IsNull()) {
+      // Extract boolean constant value
+      recursive = val.GetValue<bool>();
+    }
+  }
+
+  // Canonicalize dataset path: ensure we call downloader with owner/dataset
+  // even if caller provided owner/dataset/... nested path
+  string ds = result->dataset_path;
+  auto first_slash = ds.find('/');
+  if (first_slash == string::npos) {
+    throw InvalidInputException("Invalid dataset path: must be owner/dataset");
+  }
+  auto second_slash = ds.find('/', first_slash + 1);
+  string canonical_ds;
+  string nested_path;
+  if (second_slash == string::npos) {
+    canonical_ds = ds;
+    nested_path = string();
+  } else {
+    canonical_ds = ds.substr(0, second_slash);
+    nested_path = ds.substr(second_slash + 1);
+  }
+
+  // Verify that the dataset is downloaded and get directory for canonical
+  // dataset
+  char *dir_c = gaggle_download_dataset(canonical_ds.c_str());
   if (!dir_c) {
     throw InvalidInputException("Failed to download dataset: " +
                                 GetGaggleError());
@@ -626,25 +690,150 @@ static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
   string dir_path(dir_c);
   gaggle_free(dir_c);
 
-  // Enumerate files (non-recursive)
+  fs::path dataset_root(dir_path);
+
   try {
-    for (const auto &entry : fs::directory_iterator(dir_path)) {
-      if (!entry.is_regular_file()) {
-        continue;
+    if (nested_path.empty()) {
+      if (recursive) {
+        // Recursively walk and collect all regular files under dir_path
+        for (const auto &entry : fs::recursive_directory_iterator(dir_path)) {
+          if (!entry.is_regular_file()) {
+            continue;
+          }
+          auto name = entry.path().filename().string();
+          if (name == ".downloaded") {
+            continue;
+          }
+          auto full_path = entry.path().string();
+          // Compute relative path WRT dataset root
+          fs::path rel = fs::path(full_path).lexically_relative(dataset_root);
+          string rel_str;
+          if (rel.empty()) {
+            rel_str = canonical_ds + string("/") + entry.path().filename().string();
+          } else {
+            rel_str = canonical_ds + string("/") + rel.string();
+          }
+          std::error_code ec;
+          auto file_size = entry.file_size(ec);
+          if (ec)
+            continue;
+          int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
+          result->names.push_back(name);
+          result->paths.push_back(rel_str);
+          result->sizes.push_back(size_mb);
+        }
+      } else {
+        // Non-recursive: list top-level files
+        for (const auto &entry : fs::directory_iterator(dir_path)) {
+          if (!entry.is_regular_file()) {
+            continue;
+          }
+          auto name = entry.path().filename().string();
+          if (name == ".downloaded") {
+            continue;
+          }
+          auto full_path = entry.path().string();
+          fs::path rel = fs::path(full_path).lexically_relative(dataset_root);
+          string rel_str;
+          if (rel.empty()) {
+            rel_str = canonical_ds + string("/") + entry.path().filename().string();
+          } else {
+            rel_str = canonical_ds + string("/") + rel.string();
+          }
+          std::error_code ec;
+          auto file_size = entry.file_size(ec);
+          if (ec)
+            continue;
+          int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
+          result->names.push_back(name);
+          result->paths.push_back(rel_str);
+          result->sizes.push_back(size_mb);
+        }
       }
-      auto name = entry.path().filename().string();
-      if (name == ".downloaded") {
-        continue;
-      }
-      auto full_path = entry.path().string();
+    } else {
+      // Nested path provided: inspect the nested path inside the downloaded
+      // canonical dataset
+      fs::path target = fs::path(dir_path) / fs::path(nested_path);
       std::error_code ec;
-      auto file_size = entry.file_size(ec);
-      if (ec)
-        continue;
-      int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
-      result->names.push_back(name);
-      result->paths.push_back(full_path);
-      result->sizes.push_back(size_mb);
+      if (!fs::exists(target, ec)) {
+        throw InvalidInputException(
+            string("Requested nested path does not exist: ") +
+            target.string());
+      }
+      if (fs::is_directory(target, ec)) {
+        if (recursive) {
+          for (const auto &entry : fs::recursive_directory_iterator(target)) {
+            if (!entry.is_regular_file()) {
+              continue;
+            }
+            auto name = entry.path().filename().string();
+            if (name == ".downloaded") {
+              continue;
+            }
+            auto full_path = entry.path().string();
+            fs::path rel = fs::path(full_path).lexically_relative(dataset_root);
+            string rel_str;
+            if (rel.empty()) {
+              rel_str = canonical_ds + string("/") + entry.path().filename().string();
+            } else {
+              rel_str = canonical_ds + string("/") + rel.string();
+            }
+            std::error_code ec2;
+            auto file_size = entry.file_size(ec2);
+            if (ec2)
+              continue;
+            int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
+            result->names.push_back(name);
+            result->paths.push_back(rel_str);
+            result->sizes.push_back(size_mb);
+          }
+        } else {
+          for (const auto &entry : fs::directory_iterator(target)) {
+            if (!entry.is_regular_file()) {
+              continue;
+            }
+            auto name = entry.path().filename().string();
+            if (name == ".downloaded") {
+              continue;
+            }
+            auto full_path = entry.path().string();
+            fs::path rel = fs::path(full_path).lexically_relative(dataset_root);
+            string rel_str;
+            if (rel.empty()) {
+              rel_str = canonical_ds + string("/") + entry.path().filename().string();
+            } else {
+              rel_str = canonical_ds + string("/") + rel.string();
+            }
+            std::error_code ec2;
+            auto file_size = entry.file_size(ec2);
+            if (ec2)
+              continue;
+            int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
+            result->names.push_back(name);
+            result->paths.push_back(rel_str);
+            result->sizes.push_back(size_mb);
+          }
+        }
+      } else {
+        // Target is a file: return that single file
+        auto name = target.filename().string();
+        std::error_code ec2;
+        auto file_size = fs::file_size(target, ec2);
+        if (!ec2) {
+          int64_t size_mb = static_cast<int64_t>(file_size / (1024 * 1024));
+          // compute relative path
+          fs::path rel = target.lexically_relative(dataset_root);
+          string rel_str;
+          if (rel.empty()) {
+            rel_str = canonical_ds + string("/") + target.filename().string();
+          } else {
+            rel_str = canonical_ds + string("/") + rel.string();
+          }
+          result->names.push_back(name);
+          result->paths.push_back(rel_str);
+          result->sizes.push_back(size_mb);
+        }
+      }
     }
   } catch (const std::exception &e) {
     throw InvalidInputException(string("Failed to enumerate files: ") +
@@ -737,6 +926,12 @@ static void LoadInternal(ExtensionLoader &loader) {
   TableFunction ls_fun("gaggle_ls", {LogicalType::VARCHAR}, GaggleLsFunction,
                        GaggleLsBind, GaggleLsInitGlobal, nullptr);
   loader.RegisterFunction(ls_fun);
+
+  // Also register gaggle_ls(dataset_path, recursive BOOLEAN)
+  TableFunction ls_fun_recursive(
+      "gaggle_ls", {LogicalType::VARCHAR, LogicalType::BOOLEAN},
+      GaggleLsFunction, GaggleLsBind, GaggleLsInitGlobal, nullptr);
+  loader.RegisterFunction(ls_fun_recursive);
 
   // Register replacement scan for "kaggle:" prefix via DBConfig
   auto &db = loader.GetDatabaseInstance();

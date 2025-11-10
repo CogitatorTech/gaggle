@@ -14,12 +14,17 @@ execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'
 
 -- Section 2: list and process multiple files
 select '## list and process dataset files (json and table)';
+-- Note: `path` values returned by gaggle_ls are of the form 'owner/dataset/<relative-path>' (not absolute filesystem paths)
 with files as (
   select to_json(list(struct_pack(name := name, size := size, path := path))) as files_json
   from gaggle_ls('habedi/flickr-8k-dataset-clean')
 )
 select files_json from files;
 select * from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
+
+-- Recursive listing (example)
+select '## recursive listing example for flickr dataset';
+select * from gaggle_ls('habedi/flickr-8k-dataset-clean', true) limit 10;
 
 -- Section 2b: use replacement scan for direct reads via `kaggle:` URLs
 select '## Replacement scan - direct reads via `kaggle:`';

@@ -97,10 +97,10 @@ make release
 -- Get extension version
 select gaggle_version();
 
--- List files in the dataset
+-- List files in the dataset (recursively)
 -- (Note that if the datasets is not downloaded, it will be downloaded and cached)
 select *
-from gaggle_ls('habedi/flickr-8k-dataset-clean') limit 5;
+from gaggle_ls('habedi/flickr-8k-dataset-clean', true) limit 5;
 
 -- Read a Parquet file from the local cache using a prepared statement
 prepare rp as select * from read_parquet(?) limit 10;
@@ -110,7 +110,7 @@ execute rp(gaggle_file_path('habedi/flickr-8k-dataset-clean', 'flickr8k.parquet'
 select count(*)
 from 'kaggle:habedi/flickr-8k-dataset-clean/flickr8k.parquet';
 
--- Optionally, we check cache info
+-- Then, we check cache info
 select gaggle_cache_info();
 
 -- Check if cached dataset is current (is the newest version?)
