@@ -17,7 +17,7 @@ The table below includes the information about all SQL functions exposed by Gagg
 | 11 | `gaggle_version_info(dataset_path VARCHAR)`                     | `VARCHAR (JSON)`                                 | Returns version info: `cached_version`, `latest_version`, `is_current`, `is_cached`.                                                            |
 | 12 | `gaggle_json_each(json VARCHAR)`                                | `VARCHAR`                                        | Expands a JSON object into newline-delimited JSON rows with fields: `key`, `value`, `type`, `path`. Users normally shouldn't use this function. |
 | 13 | `gaggle_file_path(dataset_path VARCHAR, filename VARCHAR)`      | `VARCHAR`                                        | Resolves a specific file's local path inside a downloaded dataset.                                                                              |
-| 14 | `gaggle_ls(dataset_path VARCHAR)`                               | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files (non-recursively) in the dataset's local directory; `size` is in MB.                                                                |
+| 14 | `gaggle_ls(dataset_path VARCHAR[, recursive BOOLEAN])`            | `TABLE(name VARCHAR, size BIGINT, path VARCHAR)` | Lists files in the dataset's local directory; non-recursive by default. When `recursive=true` will walk subdirectories. `path` values are returned as `owner/dataset/<relative-path>` (not an absolute filesystem path); `size` is in MB. |
 
 > [!NOTE]
 > * The `gaggle_file_path` function will retrieve and cache the file if it is not already downloaded; set
@@ -65,13 +65,21 @@ select gaggle_info('uciml/iris') as dataset_metadata;
 #### Reading Data
 
 ```sql
--- List files as a table
+-- List files as a table (non-recursive)
 select *
 from gaggle_ls('uciml/iris') limit 5;
+
+-- List files as a table (recursive)
+select *
+from gaggle_ls('suganthidevasagayam/social-media-post-of-postpartum-depression', true) limit 10;
 
 -- List files as a JSON array
 select to_json(list(struct_pack(name := name, size := size, path := path))) as files_json
 from gaggle_ls('uciml/iris');
+
+-- Note: returned `path` values are in the form 'owner/dataset/...',
+-- which work for use with replacement scans or as an identifier inside the cache;
+-- to get an absolute filesystem path use `gaggle_file_path(owner_dataset, relative_path)`.
 
 -- Resolve a file path and read it via a prepared statement
 prepare rp as select * from read_parquet(?) limit 10;
