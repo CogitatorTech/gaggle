@@ -96,3 +96,5 @@ uv.lock
 tests/temp_models/
 *.cast
 *.proptest-regressions
+.claude/
+.codex
