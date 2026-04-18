@@ -40,6 +40,11 @@ namespace duckdb {
 using namespace gaggle;
 namespace fs = std::filesystem;
 
+template <typename T>
+static T *GetFlatVectorDataWritable(Vector &vector) {
+  return const_cast<T *>(FlatVector::GetData<T>(vector));
+}
+
 /**
  * @brief Retrieves the last error message from the Gaggle Rust core.
  * @return A string containing the error message, or "unknown error" if not set.
@@ -862,9 +867,9 @@ static void GaggleLsFunction(ClientContext &context, TableFunctionInput &data_p,
   idx_t remaining = bind.names.size() - state.pos;
   idx_t count = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
   output.SetCardinality(count);
-  auto name_out = FlatVector::GetDataMutable<string_t>(output.data[0]);
-  auto size_out = FlatVector::GetDataMutable<int64_t>(output.data[1]);
-  auto path_out = FlatVector::GetDataMutable<string_t>(output.data[2]);
+  auto name_out = GetFlatVectorDataWritable<string_t>(output.data[0]);
+  auto size_out = GetFlatVectorDataWritable<int64_t>(output.data[1]);
+  auto path_out = GetFlatVectorDataWritable<string_t>(output.data[2]);
   for (idx_t i = 0; i < count; i++) {
     auto idx = state.pos + i;
     name_out[i] = StringVector::AddString(output.data[0], bind.names[idx]);
