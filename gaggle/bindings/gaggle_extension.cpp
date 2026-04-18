@@ -862,9 +862,9 @@ static void GaggleLsFunction(ClientContext &context, TableFunctionInput &data_p,
   idx_t remaining = bind.names.size() - state.pos;
   idx_t count = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
   output.SetCardinality(count);
-  auto name_out = FlatVector::GetData<string_t>(output.data[0]);
-  auto size_out = FlatVector::GetData<int64_t>(output.data[1]);
-  auto path_out = FlatVector::GetData<string_t>(output.data[2]);
+  auto name_out = FlatVector::GetDataMutable<string_t>(output.data[0]);
+  auto size_out = FlatVector::GetDataMutable<int64_t>(output.data[1]);
+  auto path_out = FlatVector::GetDataMutable<string_t>(output.data[2]);
   for (idx_t i = 0; i < count; i++) {
     auto idx = state.pos + i;
     name_out[i] = StringVector::AddString(output.data[0], bind.names[idx]);
