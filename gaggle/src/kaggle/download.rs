@@ -870,6 +870,7 @@ pub fn get_dataset_version_info(dataset_path: &str) -> Result<serde_json::Value,
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::io::Write;
     use tempfile::TempDir;
 
@@ -1189,6 +1190,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_cached_datasets_empty() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
@@ -1200,6 +1202,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_total_cache_size_empty() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
@@ -1219,6 +1222,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_enforce_cache_limit_within_limit() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
@@ -1244,6 +1248,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_is_dataset_current_not_cached() {
         std::env::set_var("KAGGLE_USERNAME", "test");
         std::env::set_var("KAGGLE_KEY", "test");
@@ -1265,6 +1270,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_dataset_version_info_structure() {
         std::env::set_var("KAGGLE_USERNAME", "test");
         std::env::set_var("KAGGLE_KEY", "test");
@@ -1287,6 +1293,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_download_with_version_parsing() {
         // Test that version syntax is properly parsed
         std::env::set_var("KAGGLE_USERNAME", "test");
@@ -1307,6 +1314,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_versioned_cache_directory() {
         // Verify that versioned downloads use different cache directories
 
@@ -1334,6 +1342,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_partial_cache_counts_and_eviction() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var("GAGGLE_CACHE_DIR", temp_dir.path());
