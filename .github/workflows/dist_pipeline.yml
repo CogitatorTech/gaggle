@@ -1,4 +1,5 @@
 name: Build Extension Binaries
+
 on:
   workflow_dispatch:
   schedule: # Run every day at midnight (UTC)
