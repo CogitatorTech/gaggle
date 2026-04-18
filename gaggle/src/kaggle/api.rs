@@ -173,6 +173,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_with_retries_success_after_failures() {
         let mut call_count = 0;
         let result = with_retries(|| {
@@ -189,6 +190,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_with_retries_exhausts_attempts() {
         env::set_var("GAGGLE_HTTP_RETRY_ATTEMPTS", "2");
         env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.001");
@@ -207,6 +209,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_with_retries_exponential_backoff() {
         env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.05");
         env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "0.1");
@@ -231,6 +234,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_with_retries_respects_max_delay() {
         env::set_var("GAGGLE_HTTP_RETRY_DELAY", "0.05");
         env::set_var("GAGGLE_HTTP_RETRY_MAX_DELAY", "0.1");
