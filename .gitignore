@@ -98,3 +98,5 @@ tests/temp_models/
 *.proptest-regressions
 .claude/
 .codex
+.antigravitycli/
+.agents/
