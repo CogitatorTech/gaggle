@@ -31,6 +31,8 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "duckdb.h"
@@ -43,6 +45,37 @@ namespace fs = std::filesystem;
 template <typename T>
 static T *GetFlatVectorDataWritable(Vector &vector) {
   return const_cast<T *>(FlatVector::GetData<T>(vector));
+}
+
+template <int N> struct PriorityTag : PriorityTag<N - 1> {};
+
+template <> struct PriorityTag<0> {};
+
+template <typename T = FunctionExpression>
+static auto MakeFunctionExpressionCompat(
+    const string &func_name, vector<unique_ptr<ParsedExpression>> children,
+    PriorityTag<1>)
+    -> decltype(make_uniq<T>(std::decay_t<decltype(std::declval<T>().FunctionName())>(
+                                 func_name),
+                             std::move(children))) {
+  using FunctionNameType =
+      std::decay_t<decltype(std::declval<T>().FunctionName())>;
+  return make_uniq<T>(FunctionNameType(func_name), std::move(children));
+}
+
+template <typename T = FunctionExpression>
+static auto MakeFunctionExpressionCompat(
+    const string &func_name, vector<unique_ptr<ParsedExpression>> children,
+    PriorityTag<0>)
+    -> decltype(make_uniq<T>(func_name, std::move(children))) {
+  return make_uniq<T>(func_name, std::move(children));
+}
+
+static unique_ptr<FunctionExpression>
+MakeFunctionExpressionCompat(const string &func_name,
+                             vector<unique_ptr<ParsedExpression>> children) {
+  return MakeFunctionExpressionCompat(func_name, std::move(children),
+                                      PriorityTag<1>{});
 }
 
 /**
@@ -635,8 +668,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
   // Construct a table function call: func_name(local_path)
   vector<unique_ptr<ParsedExpression>> children;
   children.push_back(make_uniq<ConstantExpression>(Value(local_path)));
-  auto func_expr =
-      make_uniq<FunctionExpression>(func_name, std::move(children));
+  auto func_expr = MakeFunctionExpressionCompat(func_name, std::move(children));
 
   // Create a TableFunctionRef manually
   auto table_func_ref = make_uniq<TableFunctionRef>();
