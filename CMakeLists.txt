@@ -36,8 +36,7 @@ endif()
 set(OS_ARCH "${_GAGGLE_OS_ARCH}")
 
 # Derive DUCKDB_PLATFORM if missing (this is a rough heuristic mirroring DuckDB naming convention)
-# Valid values: linux_amd64, linux_arm64, osx_amd64, osx_arm64, osx_universal, windows_amd64
-# Note: we do not currently handle Windows ARM (windows_arm64) as DuckDB does not provide such builds.
+# Valid values: linux_amd64, linux_arm64, osx_amd64, osx_arm64, osx_universal, windows_amd64, windows_arm64
 # Note: we do not currently handle musl vs gnu variants on Linux; users can manually set DUCKDB_PLATFORM if needed.
 # Note: we do not currently handle wasm variants; users can manually set DUCKDB_PLATFORM if needed.
 set(DUCKDB_PLATFORM "${DUCKDB_PLATFORM}")
@@ -59,6 +58,8 @@ if("${DUCKDB_PLATFORM}" STREQUAL "")
   elseif(WIN32)
     if(_GAGGLE_OS_ARCH STREQUAL "amd64")
       set(DUCKDB_PLATFORM windows_amd64)
+    elseif(_GAGGLE_OS_ARCH STREQUAL "arm64")
+      set(DUCKDB_PLATFORM windows_arm64)
     endif()
   endif()
 endif()
