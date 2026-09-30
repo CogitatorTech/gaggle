@@ -32,6 +32,7 @@ jobs:
     with:
       duckdb_version: main
       ci_tools_version: main
+      runners: '{"windows_amd64":"windows-2022"}'
       extension_name: gaggle
       enable_rust: true
       opt_in_archs: "windows_arm64"
