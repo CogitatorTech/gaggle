@@ -29,6 +29,7 @@ Priorities, in order:
 
 ## Writing Style
 
+- Write in simple, plain English. Use short sentences and everyday words.
 - Use Oxford commas in inline lists: "a, b, and c" not "a, b, c".
 - Do not use em dashes. Restructure the sentence, or use a colon or semicolon instead.
 - Avoid colorful adjectives and adverbs. Write "TCP proxy" not "lightweight TCP proxy", "scoring components" not "transparent scoring components".
