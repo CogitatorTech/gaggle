@@ -39,122 +39,186 @@ extern "C" {
 /**
  * Clears the last error for the current thread.
  *
- * This is useful for making sure that old error messages don't persist
+ * This is useful for ensuring that old error messages don't persist
  * and get confused with new errors.
  */
  void gaggle_clear_last_error(void);
 
 /**
- * Initialize logging for the Rust core based on GAGGLE_LOG_LEVEL
+ * Initializes logging for the Gaggle Rust core.
+ *
+ * This function sets up the logging framework based on the `GAGGLE_LOG_LEVEL`
+ * environment variable. It should be called once at the beginning of the
+ * application's lifecycle.
  */
  void gaggle_init_logging(void);
 
 /**
- * Set Kaggle API credentials
+ * Sets the Kaggle API credentials.
  *
- * Arguments:
- * - `username`: non-null pointer to a NUL-terminated C string
- * - `key`: non-null pointer to a NUL-terminated C string
+ * # Arguments
  *
- * Returns 0 on success, -1 on failure (call gaggle_last_error).
+ * * `username` - A non-null pointer to a NUL-terminated C string representing the Kaggle username.
+ * * `key` - A non-null pointer to a NUL-terminated C string representing the Kaggle API key.
  *
- * Safety:
- * - The pointers must be valid and remain alive for the duration of this call.
- * - Strings must be valid UTF-8; interior NULs are not allowed.
+ * # Returns
+ *
+ * Returns `0` on success, or `-1` on failure. If the operation fails,
+ * a detailed error message can be retrieved using `gaggle_last_error`.
+ *
+ * # Safety
+ *
+ * - The pointers must be valid and remain accessible for the duration of this call.
+ * - The provided strings must be valid UTF-8, and interior NUL characters are not permitted.
  */
  int32_t gaggle_set_credentials(const char *username, const char *key);
 
 /**
- * Download a Kaggle dataset and return its local cache path
+ * Downloads a Kaggle dataset and returns its local cache path.
  *
- * Arguments:
- * - `dataset_path`: non-null pointer to a NUL-terminated C string "owner/dataset[[@vN|@latest]]".
+ * # Arguments
  *
- * Returns pointer to a heap-allocated C string. Free with gaggle_free(). On error, returns NULL and sets gaggle_last_error.
+ * * `dataset_path` - A non-null pointer to a NUL-terminated C string in the format
+ *   "owner/dataset[[@vN|@latest]]".
  *
- * Safety:
- * - The pointer must be valid and the string valid UTF-8; interior NULs are not allowed.
+ * # Returns
+ *
+ * Returns a pointer to a heap-allocated C string containing the local path.
+ * This string must be freed with `gaggle_free()`. On error, returns `NULL`
+ * and sets a detailed error message retrievable with `gaggle_last_error`.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and the string must be valid UTF-8.
+ * - Interior NUL characters are not allowed in the string.
  */
-
-char *gaggle_download_dataset(const char *dataset_path);
+ char *gaggle_download_dataset(const char *dataset_path);
 
 /**
- * Get the local path to a specific file in a downloaded dataset
+ * Retrieves the local path to a specific file within a downloaded dataset.
  *
- * Arguments:
- * - `dataset_path`: non-null pointer to owner/dataset
- * - `filename`: non-null pointer to relative filename within the dataset
+ * # Arguments
+ *
+ * * `dataset_path` - A non-null pointer to a NUL-terminated C string representing the owner and dataset.
+ * * `filename` - A non-null pointer to a NUL-terminated C string for the relative filename inside the dataset.
+ *
+ * # Safety
+ *
+ * - Both pointers must be valid and point to valid NUL-terminated C strings.
+ * - The strings must be valid UTF-8, and interior NUL characters are not allowed.
  */
- char *gaggle_get_file_path(const char *dataset_path, const char *filename);
+
+char *gaggle_get_file_path(const char *dataset_path,
+                           const char *filename);
 
 /**
- * List files in a Kaggle dataset
+ * Lists the files available in a Kaggle dataset.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_list_files(const char *dataset_path);
 
 /**
- * Search for Kaggle datasets
+ * Searches for Kaggle datasets.
+ *
+ * # Safety
+ *
+ * - The `query` pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_search(const char *query, int32_t page, int32_t page_size);
 
 /**
- * Get metadata for a specific Kaggle dataset
+ * Retrieves metadata for a specific Kaggle dataset.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_get_dataset_info(const char *dataset_path);
 
 /**
- * Get version information
+ * Retrieves the version of the Gaggle library.
  */
  char *gaggle_get_version(void);
 
 /**
- * Frees a heap-allocated C string
+ * Frees a heap-allocated C string.
  *
- * Safety:
- * - `ptr` must be a pointer previously returned by a Gaggle FFI function that transfers ownership
- *   (e.g., gaggle_get_version, gaggle_list_files, etc.).
- * - Passing the same pointer twice, or a pointer not allocated by Gaggle, results in undefined behavior.
+ * # Safety
+ *
+ * `ptr` must be a pointer previously returned by a Gaggle FFI function that transfers ownership,
+ * such as `gaggle_get_version` or `gaggle_list_files`. Passing the same pointer more than once,
+ * or providing a pointer not allocated by Gaggle, will result in undefined behavior.
  */
-
-void gaggle_free(char *ptr);
+ void gaggle_free(char *ptr);
 
 /**
- * Clear the dataset cache
+ * Clears the dataset cache.
  */
  int32_t gaggle_clear_cache(void);
 
 /**
- * Enforce cache size limit by evicting oldest datasets
+ * Enforces the cache size limit by evicting the oldest datasets.
  */
  int32_t gaggle_enforce_cache_limit(void);
 
 /**
- * Check if cached dataset is the current version
+ * Checks if the cached dataset is the current version.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  int32_t gaggle_is_dataset_current(const char *dataset_path);
 
 /**
- * Force update dataset to latest version (ignores cache)
+ * Forces an update of the dataset to the latest version, ignoring the cache.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_update_dataset(const char *dataset_path);
 
 /**
- * Get version information for a dataset
+ * Retrieves version information for a dataset.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_dataset_version_info(const char *dataset_path);
 
 /**
- * Get cache information
+ * Retrieves information about the cache.
  */
  char *gaggle_get_cache_info(void);
 
 /**
- * Parse JSON and expand objects/arrays similar to json_each
+ * Parses JSON and expands objects/arrays, similar to `json_each`.
+ *
+ * # Safety
+ *
+ * - The pointer must be valid and point to a valid NUL-terminated C string.
+ * - The string must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_json_each(const char *json_str);
 
 /**
- * Prefetch multiple files in a dataset without downloading the entire archive
+ * Prefetches multiple files in a dataset without downloading the entire archive.
+ *
+ * # Safety
+ *
+ * - Both pointers must be valid and point to valid NUL-terminated C strings.
+ * - The strings must be valid UTF-8, and interior NUL characters are not allowed.
  */
  char *gaggle_prefetch_files(const char *dataset_path, const char *file_list);
 
