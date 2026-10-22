@@ -990,45 +990,46 @@ static void LoadInternal(ExtensionLoader &loader) {
   gaggle_init_logging();
 
   // Scalar functions (public)
-  loader.RegisterFunction(ScalarFunction(
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_set_credentials", {LogicalType::VARCHAR, LogicalType::VARCHAR},
       LogicalType::BOOLEAN, SetCredentials));
   loader.RegisterFunction(
-      ScalarFunction("gaggle_download", {LogicalType::VARCHAR},
-                     LogicalType::VARCHAR, DownloadDataset));
-  loader.RegisterFunction(ScalarFunction(
+      GaggleScalarFunction("gaggle_download", {LogicalType::VARCHAR},
+                           LogicalType::VARCHAR, DownloadDataset));
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_search",
       {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER},
       LogicalType::VARCHAR, SearchDatasets));
-  loader.RegisterFunction(ScalarFunction("gaggle_info", {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, GetDatasetInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      GetDatasetInfo));
   // Single canonical version endpoint
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_version", {}, LogicalType::VARCHAR, GetVersion));
-  loader.RegisterFunction(ScalarFunction("gaggle_clear_cache", {},
-                                         LogicalType::BOOLEAN, ClearCache));
-  loader.RegisterFunction(ScalarFunction("gaggle_cache_info", {},
-                                         LogicalType::VARCHAR, GetCacheInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_enforce_cache_limit", {},
-                                         LogicalType::BOOLEAN,
-                                         EnforceCacheLimit));
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_is_current", {LogicalType::VARCHAR},
-                     LogicalType::BOOLEAN, IsDatasetCurrent));
-  loader.RegisterFunction(ScalarFunction("gaggle_update_dataset",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, UpdateDataset));
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_version_info", {LogicalType::VARCHAR},
-                     LogicalType::VARCHAR, GetDatasetVersionInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_json_each",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, JsonEach));
-  loader.RegisterFunction(ScalarFunction(
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_version", {}, LogicalType::VARCHAR, GetVersion, false));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_clear_cache", {}, LogicalType::BOOLEAN, ClearCache));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_cache_info", {}, LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_enforce_cache_limit", {}, LogicalType::BOOLEAN,
+      EnforceCacheLimit));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_is_current", {LogicalType::VARCHAR}, LogicalType::BOOLEAN,
+      IsDatasetCurrent));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_update_dataset", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      UpdateDataset));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_version_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      GetDatasetVersionInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_json_each", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      JsonEach));
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_file_path", {LogicalType::VARCHAR, LogicalType::VARCHAR},
       LogicalType::VARCHAR, GetFilePath));
-  loader.RegisterFunction(ScalarFunction("gaggle_last_error", {},
-                                         LogicalType::VARCHAR, GetLastError));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_last_error", {}, LogicalType::VARCHAR, GetLastError, false));
 
   // Table function: gaggle_ls(dataset_path) -> name,size,path
   TableFunction ls_fun("gaggle_ls", {LogicalType::VARCHAR}, GaggleLsFunction,
