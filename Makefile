@@ -148,6 +148,6 @@ examples: ## Run SQL examples for Gaggle extension
 	@echo "Running the examples in the ${EXAMPLES_DIR} directory..."
 	@for sql_file in $(EXAMPLES_DIR)/*.sql; do \
 		echo "Running example: $$sql_file"; \
-		./build/release/duckdb < $$sql_file; \
+		./build/release/duckdb -unsigned < $$sql_file || true; \
 		echo "============================================================================"; \
 	done

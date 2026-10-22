@@ -137,6 +137,22 @@ static void AddReplacementScanCompat(T &scans, ReplacementScan scan) {
   AddReplacementScanCompat(scans, std::move(scan), PriorityTag<1>{});
 }
 
+template <typename T>
+static auto SetCardinalityCompat(T &chunk, idx_t count, PriorityTag<1>)
+    -> decltype(chunk.SetChildCardinality(count), void()) {
+  chunk.SetChildCardinality(count);
+}
+
+template <typename T>
+static void SetCardinalityCompat(T &chunk, idx_t count, PriorityTag<0>) {
+  chunk.SetCardinality(count);
+}
+
+template <typename T>
+static void SetCardinalityCompat(T &chunk, idx_t count) {
+  SetCardinalityCompat(chunk, count, PriorityTag<1>{});
+}
+
 template <typename T> struct bind_names_type;
 
 template <typename Ret, typename A1, typename A2, typename A3, typename A4>
@@ -964,12 +980,12 @@ static void GaggleLsFunction(ClientContext &context, TableFunctionInput &data_p,
   auto &bind = data_p.bind_data->Cast<GaggleLsBindData>();
   auto &state = data_p.global_state->Cast<GaggleLsGlobalState>();
   if (state.pos >= bind.names.size()) {
-    output.SetCardinality(0);
+    SetCardinalityCompat(output, 0);
     return;
   }
   idx_t remaining = bind.names.size() - state.pos;
   idx_t count = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
-  output.SetCardinality(count);
+  SetCardinalityCompat(output, count);
   auto name_out = GetFlatVectorDataWritable<string_t>(output.data[0]);
   auto size_out = GetFlatVectorDataWritable<int64_t>(output.data[1]);
   auto path_out = GetFlatVectorDataWritable<string_t>(output.data[2]);
