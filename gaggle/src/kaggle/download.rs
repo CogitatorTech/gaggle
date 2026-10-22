@@ -163,11 +163,7 @@ fn download_dataset_version(
     // If another thread is downloading, wait with timeout (configurable)
     let poll_ms = crate::config::download_wait_poll_interval_ms();
     let timeout_ms = crate::config::download_wait_timeout_ms();
-    let max_attempts: u64 = if poll_ms == 0 {
-        0
-    } else {
-        timeout_ms / poll_ms
-    };
+    let max_attempts = timeout_ms.checked_div(poll_ms).unwrap_or(0);
     let mut wait_attempts: u64 = 0;
 
     loop {
@@ -394,6 +390,9 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
         let mut entry = archive
             .by_index(i)
             .map_err(|e| GaggleError::ZipError(e.to_string()))?;
+        let entry_name = entry
+            .name()
+            .map_err(|e| GaggleError::ZipError(e.to_string()))?;
 
         // Reject symlink entries based on UNIX mode bits if present
         if let Some(mode) = entry.unix_mode() {
@@ -401,7 +400,7 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
             if file_type == 0o120000 {
                 return Err(GaggleError::ZipError(format!(
                     "Symlink entry not allowed in archive: {}",
-                    entry.name()
+                    entry_name
                 )));
             }
         }
@@ -436,12 +435,12 @@ pub(crate) fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<usize, Gag
         if !canonical_parent.starts_with(&canonical_dest) {
             return Err(GaggleError::ZipError(format!(
                 "Path traversal attempt detected: {:?}",
-                entry.name()
+                entry_name
             )));
         }
 
         // Directory entries
-        if entry.is_dir() || entry.name().ends_with('/') {
+        if entry.is_dir() || entry_name.ends_with('/') {
             fs::create_dir_all(&outpath)?;
             continue;
         }
