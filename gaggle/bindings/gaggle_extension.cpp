@@ -3,8 +3,7 @@
  * @brief This file contains the implementation of the Gaggle DuckDB extension.
  *
  * It includes the definitions for the scalar and table functions that provide
- * Gaggle's functionality within DuckDB, as well as the extension loading and
- * registration logic.
+ * Gaggle's functionality within DuckDB, as well as the extension loading and registration logic.
  */
 #define DUCKDB_EXTENSION_MAIN
 
@@ -77,6 +76,91 @@ MakeFunctionExpressionCompat(const string &func_name,
   return MakeFunctionExpressionCompat(func_name, std::move(children),
                                       PriorityTag<1>{});
 }
+
+template <typename T>
+static auto MarkFallibleCompat(T &func, PriorityTag<1>)
+    -> decltype(func.SetFallible(), void()) {
+  func.SetFallible();
+}
+
+template <typename T>
+static void MarkFallibleCompat(T &func, PriorityTag<0>) {
+}
+
+template <typename T>
+static void MarkFallibleCompat(T &func) {
+  MarkFallibleCompat(func, PriorityTag<1>{});
+}
+
+static ScalarFunction GaggleScalarFunction(const string &name,
+                                           vector<LogicalType> args,
+                                           LogicalType return_type,
+                                           scalar_function_t func,
+                                           bool fallible = true) {
+  ScalarFunction result(name.c_str(), std::move(args), return_type, func);
+  if (fallible) {
+    MarkFallibleCompat(result);
+  }
+  return result;
+}
+
+template <typename T = ConstantExpression>
+static auto MakeConstantExpressionCompat(const string &val, PriorityTag<1>)
+    -> decltype(T::FromValue(Value(val))) {
+  return T::FromValue(Value(val));
+}
+
+template <typename T = ConstantExpression>
+static unique_ptr<ParsedExpression>
+MakeConstantExpressionCompat(const string &val, PriorityTag<0>) {
+  return make_uniq<ConstantExpression>(Value(val));
+}
+
+static unique_ptr<ParsedExpression>
+MakeConstantExpressionCompat(const string &val) {
+  return MakeConstantExpressionCompat(val, PriorityTag<1>{});
+}
+
+template <typename T>
+static auto AddReplacementScanCompat(T &scans, ReplacementScan scan, PriorityTag<1>)
+    -> decltype(scans.insert(scans.begin(), std::move(scan)), void()) {
+  scans.insert(scans.begin(), std::move(scan));
+}
+
+template <typename T>
+static void AddReplacementScanCompat(T &scans, ReplacementScan scan, PriorityTag<0>) {
+  scans.push_back(std::move(scan));
+}
+
+template <typename T>
+static void AddReplacementScanCompat(T &scans, ReplacementScan scan) {
+  AddReplacementScanCompat(scans, std::move(scan), PriorityTag<1>{});
+}
+
+template <typename T>
+static auto SetCardinalityCompat(T &chunk, idx_t count, PriorityTag<1>)
+    -> decltype(chunk.SetChildCardinality(count), void()) {
+  chunk.SetChildCardinality(count);
+}
+
+template <typename T>
+static void SetCardinalityCompat(T &chunk, idx_t count, PriorityTag<0>) {
+  chunk.SetCardinality(count);
+}
+
+template <typename T>
+static void SetCardinalityCompat(T &chunk, idx_t count) {
+  SetCardinalityCompat(chunk, count, PriorityTag<1>{});
+}
+
+template <typename T> struct bind_names_type;
+
+template <typename Ret, typename A1, typename A2, typename A3, typename A4>
+struct bind_names_type<Ret (*)(A1, A2, A3, A4)> {
+  using type = typename std::remove_reference<A4>::type;
+};
+
+using TableBindNames = typename bind_names_type<table_function_bind_t>::type;
 
 /**
  * @brief Retrieves the last error message from the Gaggle Rust core.
@@ -521,7 +605,7 @@ struct GaggleLsGlobalState : public GlobalTableFunctionState {
 
 static unique_ptr<FunctionData>
 KaggleReadBind(ClientContext &context, TableFunctionBindInput &input,
-               vector<LogicalType> &return_types, vector<string> &names) {
+               vector<LogicalType> &return_types, TableBindNames &names) {
   auto result = make_uniq<KaggleReadBindData>();
 
   result->dataset_path = input.inputs[0].ToString();
@@ -667,7 +751,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
 
   // Construct a table function call: func_name(local_path)
   vector<unique_ptr<ParsedExpression>> children;
-  children.push_back(make_uniq<ConstantExpression>(Value(local_path)));
+  children.push_back(MakeConstantExpressionCompat(local_path));
   auto func_expr = MakeFunctionExpressionCompat(func_name, std::move(children));
 
   // Create a TableFunctionRef manually
@@ -679,7 +763,7 @@ KaggleReplacementScan(ClientContext &context, ReplacementScanInput &input,
 static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
                                              TableFunctionBindInput &input,
                                              vector<LogicalType> &return_types,
-                                             vector<string> &names) {
+                                             TableBindNames &names) {
   auto result = make_uniq<GaggleLsBindData>();
 
   // Accept either gaggle_ls(dataset_path) or gaggle_ls(dataset_path, recursive)
@@ -879,7 +963,10 @@ static unique_ptr<FunctionData> GaggleLsBind(ClientContext &context,
 
   return_types = {LogicalType::VARCHAR, LogicalType::BIGINT,
                   LogicalType::VARCHAR};
-  names = {"name", "size", "path"};
+  names.clear();
+  names.emplace_back("name");
+  names.emplace_back("size");
+  names.emplace_back("path");
   return std::move(result);
 }
 
@@ -893,12 +980,12 @@ static void GaggleLsFunction(ClientContext &context, TableFunctionInput &data_p,
   auto &bind = data_p.bind_data->Cast<GaggleLsBindData>();
   auto &state = data_p.global_state->Cast<GaggleLsGlobalState>();
   if (state.pos >= bind.names.size()) {
-    output.SetCardinality(0);
+    SetCardinalityCompat(output, 0);
     return;
   }
   idx_t remaining = bind.names.size() - state.pos;
   idx_t count = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
-  output.SetCardinality(count);
+  SetCardinalityCompat(output, count);
   auto name_out = GetFlatVectorDataWritable<string_t>(output.data[0]);
   auto size_out = GetFlatVectorDataWritable<int64_t>(output.data[1]);
   auto path_out = GetFlatVectorDataWritable<string_t>(output.data[2]);
@@ -919,45 +1006,46 @@ static void LoadInternal(ExtensionLoader &loader) {
   gaggle_init_logging();
 
   // Scalar functions (public)
-  loader.RegisterFunction(ScalarFunction(
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_set_credentials", {LogicalType::VARCHAR, LogicalType::VARCHAR},
       LogicalType::BOOLEAN, SetCredentials));
   loader.RegisterFunction(
-      ScalarFunction("gaggle_download", {LogicalType::VARCHAR},
-                     LogicalType::VARCHAR, DownloadDataset));
-  loader.RegisterFunction(ScalarFunction(
+      GaggleScalarFunction("gaggle_download", {LogicalType::VARCHAR},
+                           LogicalType::VARCHAR, DownloadDataset));
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_search",
       {LogicalType::VARCHAR, LogicalType::INTEGER, LogicalType::INTEGER},
       LogicalType::VARCHAR, SearchDatasets));
-  loader.RegisterFunction(ScalarFunction("gaggle_info", {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, GetDatasetInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      GetDatasetInfo));
   // Single canonical version endpoint
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_version", {}, LogicalType::VARCHAR, GetVersion));
-  loader.RegisterFunction(ScalarFunction("gaggle_clear_cache", {},
-                                         LogicalType::BOOLEAN, ClearCache));
-  loader.RegisterFunction(ScalarFunction("gaggle_cache_info", {},
-                                         LogicalType::VARCHAR, GetCacheInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_enforce_cache_limit", {},
-                                         LogicalType::BOOLEAN,
-                                         EnforceCacheLimit));
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_is_current", {LogicalType::VARCHAR},
-                     LogicalType::BOOLEAN, IsDatasetCurrent));
-  loader.RegisterFunction(ScalarFunction("gaggle_update_dataset",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, UpdateDataset));
-  loader.RegisterFunction(
-      ScalarFunction("gaggle_version_info", {LogicalType::VARCHAR},
-                     LogicalType::VARCHAR, GetDatasetVersionInfo));
-  loader.RegisterFunction(ScalarFunction("gaggle_json_each",
-                                         {LogicalType::VARCHAR},
-                                         LogicalType::VARCHAR, JsonEach));
-  loader.RegisterFunction(ScalarFunction(
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_version", {}, LogicalType::VARCHAR, GetVersion, false));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_clear_cache", {}, LogicalType::BOOLEAN, ClearCache));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_cache_info", {}, LogicalType::VARCHAR, GetCacheInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_enforce_cache_limit", {}, LogicalType::BOOLEAN,
+      EnforceCacheLimit));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_is_current", {LogicalType::VARCHAR}, LogicalType::BOOLEAN,
+      IsDatasetCurrent));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_update_dataset", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      UpdateDataset));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_version_info", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      GetDatasetVersionInfo));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_json_each", {LogicalType::VARCHAR}, LogicalType::VARCHAR,
+      JsonEach));
+  loader.RegisterFunction(GaggleScalarFunction(
       "gaggle_file_path", {LogicalType::VARCHAR, LogicalType::VARCHAR},
       LogicalType::VARCHAR, GetFilePath));
-  loader.RegisterFunction(ScalarFunction("gaggle_last_error", {},
-                                         LogicalType::VARCHAR, GetLastError));
+  loader.RegisterFunction(GaggleScalarFunction(
+      "gaggle_last_error", {}, LogicalType::VARCHAR, GetLastError, false));
 
   // Table function: gaggle_ls(dataset_path) -> name,size,path
   TableFunction ls_fun("gaggle_ls", {LogicalType::VARCHAR}, GaggleLsFunction,
@@ -973,8 +1061,8 @@ static void LoadInternal(ExtensionLoader &loader) {
   // Register replacement scan for "kaggle:" prefix via DBConfig
   auto &db = loader.GetDatabaseInstance();
   auto &config = DBConfig::GetConfig(db);
-  config.replacement_scans.insert(config.replacement_scans.begin(),
-                                  ReplacementScan(KaggleReplacementScan));
+  AddReplacementScanCompat(config.replacement_scans,
+                           ReplacementScan(KaggleReplacementScan));
 }
 
 // Provide out-of-line definitions for the extension class
