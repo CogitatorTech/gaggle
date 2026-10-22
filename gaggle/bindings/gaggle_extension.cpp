@@ -3,8 +3,7 @@
  * @brief This file contains the implementation of the Gaggle DuckDB extension.
  *
  * It includes the definitions for the scalar and table functions that provide
- * Gaggle's functionality within DuckDB, as well as the extension loading and
- * registration logic.
+ * Gaggle's functionality within DuckDB, as well as the extension loading and registration logic.
  */
 #define DUCKDB_EXTENSION_MAIN
 
@@ -76,6 +75,33 @@ MakeFunctionExpressionCompat(const string &func_name,
                              vector<unique_ptr<ParsedExpression>> children) {
   return MakeFunctionExpressionCompat(func_name, std::move(children),
                                       PriorityTag<1>{});
+}
+
+template <typename T>
+static auto MarkFallibleCompat(T &func, PriorityTag<1>)
+    -> decltype(func.SetFallible(), void()) {
+  func.SetFallible();
+}
+
+template <typename T>
+static void MarkFallibleCompat(T &func, PriorityTag<0>) {
+}
+
+template <typename T>
+static void MarkFallibleCompat(T &func) {
+  MarkFallibleCompat(func, PriorityTag<1>{});
+}
+
+static ScalarFunction GaggleScalarFunction(const string &name,
+                                           vector<LogicalType> args,
+                                           LogicalType return_type,
+                                           scalar_function_t func,
+                                           bool fallible = true) {
+  ScalarFunction result(name.c_str(), std::move(args), return_type, func);
+  if (fallible) {
+    MarkFallibleCompat(result);
+  }
+  return result;
 }
 
 template <typename T = ConstantExpression>
