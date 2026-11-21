@@ -1,5 +1,10 @@
 include_directories(${CMAKE_CURRENT_LIST_DIR}/gaggle/bindings/include)
 
+if(MSVC)
+    # DuckDB's skiplist redefines nullptr when __cplusplus looks older than C++11.
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
+endif()
+
 duckdb_extension_load(gaggle
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
     LOAD_TESTS
