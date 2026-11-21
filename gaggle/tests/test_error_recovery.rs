@@ -91,14 +91,13 @@ fn test_multiple_errors_in_sequence() {
         gaggle_set_credentials(std::ptr::null(), std::ptr::null());
         let err1 = gaggle_last_error();
         assert!(!err1.is_null());
+        let err1_str = CStr::from_ptr(err1).to_str().unwrap();
+        assert!(!err1_str.is_empty());
 
         gaggle_search(std::ptr::null(), 1, 10);
         let err2 = gaggle_last_error();
         assert!(!err2.is_null());
-
-        let err1_str = CStr::from_ptr(err1).to_str().unwrap();
         let err2_str = CStr::from_ptr(err2).to_str().unwrap();
-        assert!(!err1_str.is_empty());
         assert!(!err2_str.is_empty());
     }
 }
